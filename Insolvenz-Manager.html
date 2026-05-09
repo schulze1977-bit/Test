@@ -1,0 +1,1924 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insolvenz-Manager v2.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root {
+  --navy:   #1a2744;
+  --navy2:  #243460;
+  --gold:   #b8922a;
+  --gold2:  #d4a94a;
+  --bg:     #f0f4f8;
+  --white:  #ffffff;
+  --border: #dce3ee;
+  --text:   #1a2744;
+  --muted:  #6b7a99;
+  --red:    #c0392b;
+  --green:  #27ae60;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(26,39,68,.10);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Utilities ─────────────────────────────────────────────────── */
+.hidden  { display: none !important; }
+.flex    { display: flex; }
+.gap-2   { gap: .5rem; }
+.gap-4   { gap: 1rem; }
+.mt-4    { margin-top: 1rem; }
+.mt-8    { margin-top: 2rem; }
+.w-full  { width: 100%; }
+
+/* ── App Shell ─────────────────────────────────────────────────── */
+#app { max-width: 900px; margin: 0 auto; padding: 1rem; }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.app-header {
+  background: var(--navy);
+  color: var(--white);
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+}
+.app-header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.3px; }
+.app-header h1 span { color: var(--gold2); }
+.header-badge {
+  font-size: .7rem;
+  background: var(--gold);
+  color: var(--navy);
+  padding: .15rem .5rem;
+  border-radius: 20px;
+  font-weight: 700;
+  margin-left: .5rem;
+}
+.server-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  display: inline-block;
+  margin-right: .4rem;
+}
+.server-dot.online { background: var(--green); }
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .6rem 1.2rem;
+  border: none; border-radius: var(--radius);
+  font-size: .9rem; font-weight: 600; cursor: pointer;
+  transition: all .18s;
+  text-decoration: none;
+}
+.btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary   { background: var(--navy); color: var(--white); }
+.btn-gold      { background: var(--gold); color: var(--white); }
+.btn-outline   { background: transparent; border: 2px solid var(--navy); color: var(--navy); }
+.btn-danger    { background: var(--red); color: var(--white); }
+.btn-sm        { padding: .35rem .8rem; font-size: .8rem; }
+.btn-icon      { padding: .4rem .6rem; font-size: 1rem; }
+
+/* ── Case List ──────────────────────────────────────────────────── */
+.list-toolbar {
+  display: flex; align-items: center; gap: .8rem;
+  margin-bottom: 1rem; flex-wrap: wrap;
+}
+.list-toolbar h2 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+.search-box {
+  flex: 1; min-width: 180px;
+  padding: .5rem .8rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .9rem;
+  outline: none;
+}
+.search-box:focus { border-color: var(--navy); }
+
+.case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.case-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+  cursor: pointer;
+  transition: transform .18s, box-shadow .18s;
+  border-left: 4px solid var(--navy);
+  position: relative;
+}
+.case-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(26,39,68,.15); }
+.case-card.status-neu        { border-left-color: var(--gold); }
+.case-card.status-eingereicht { border-left-color: var(--green); }
+.case-card.status-abgeschlossen { border-left-color: var(--muted); }
+
+.case-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: .3rem; }
+.case-card .meta { font-size: .78rem; color: var(--muted); }
+.case-card .actions {
+  display: flex; gap: .4rem; margin-top: .8rem; opacity: 0; transition: opacity .18s;
+}
+.case-card:hover .actions { opacity: 1; }
+.status-pill {
+  display: inline-block;
+  padding: .15rem .6rem;
+  border-radius: 20px;
+  font-size: .7rem;
+  font-weight: 700;
+  background: var(--bg);
+  color: var(--muted);
+  margin-top: .4rem;
+}
+.status-pill.neu        { background: #fff3cd; color: #856404; }
+.status-pill.in_bearbeitung { background: #d1ecf1; color: #0c5460; }
+.status-pill.eingereicht    { background: #d4edda; color: #155724; }
+
+.empty-state {
+  text-align: center; padding: 3rem 1rem;
+  color: var(--muted); grid-column: 1/-1;
+}
+.empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+/* ── Progress Bar ───────────────────────────────────────────────── */
+.wizard-header {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.2rem;
+  box-shadow: var(--shadow);
+}
+.wizard-title {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: .8rem;
+}
+.wizard-title h2 { font-size: 1rem; font-weight: 700; }
+.wizard-back { color: var(--navy); font-size: .85rem; cursor: pointer; }
+.wizard-back:hover { text-decoration: underline; }
+
+.steps-nav {
+  display: flex; gap: .3rem; margin-bottom: .7rem;
+}
+.step-dot {
+  flex: 1; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  transition: background .3s;
+  cursor: pointer;
+}
+.step-dot.done    { background: var(--navy); }
+.step-dot.active  { background: var(--gold); }
+
+.step-labels {
+  display: flex; justify-content: space-between;
+  font-size: .7rem; color: var(--muted);
+}
+
+/* ── Form Cards ─────────────────────────────────────────────────── */
+.form-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  margin-bottom: 1rem;
+}
+.form-card h3 {
+  font-size: .95rem; font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 1rem;
+  padding-bottom: .6rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.form-group { margin-bottom: 1rem; }
+.form-group label {
+  display: block;
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: .35rem;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.form-group label .req { color: var(--red); margin-left: 2px; }
+
+.form-control {
+  width: 100%;
+  padding: .65rem .9rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .9rem;
+  color: var(--text);
+  background: var(--white);
+  transition: border-color .18s;
+  outline: none;
+}
+.form-control:focus { border-color: var(--navy); }
+.form-control.error { border-color: var(--red); }
+.form-control::placeholder { color: var(--muted); opacity: .7; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.form-row-3 { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: 1rem; }
+
+.field-error {
+  font-size: .75rem; color: var(--red);
+  margin-top: .25rem;
+}
+
+/* ── Radio Cards ────────────────────────────────────────────────── */
+.radio-group { display: flex; gap: .6rem; flex-wrap: wrap; }
+.radio-card {
+  flex: 1; min-width: 120px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: .8rem 1rem;
+  cursor: pointer;
+  transition: all .18s;
+  text-align: center;
+}
+.radio-card:hover { border-color: var(--navy); }
+.radio-card.selected {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--white);
+}
+.radio-card input { display: none; }
+.radio-card .label { font-size: .85rem; font-weight: 600; }
+
+/* ── Checkboxen ─────────────────────────────────────────────────── */
+.check-group { display: flex; flex-direction: column; gap: .5rem; }
+.check-item {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .7rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .18s;
+}
+.check-item:hover { border-color: var(--navy); }
+.check-item.checked { border-color: var(--navy); background: #f0f3ff; }
+.check-item input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--navy); }
+.check-item .label { font-size: .9rem; font-weight: 600; }
+.check-item .desc  { font-size: .78rem; color: var(--muted); margin-left: auto; }
+
+/* ── Toggle ─────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .7rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: .5rem;
+}
+.toggle-row .toggle-label { font-size: .9rem; font-weight: 600; }
+.toggle {
+  position: relative; width: 44px; height: 24px;
+  background: var(--border); border-radius: 12px;
+  cursor: pointer; transition: background .2s;
+}
+.toggle::after {
+  content: '';
+  position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px;
+  background: white; border-radius: 50%;
+  transition: transform .2s;
+}
+.toggle.on { background: var(--navy); }
+.toggle.on::after { transform: translateX(20px); }
+
+/* ── Gläubiger ──────────────────────────────────────────────────── */
+.glaeu-list { display: flex; flex-direction: column; gap: .6rem; }
+.glaeu-item {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border-left: 3px solid var(--gold);
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: .8rem;
+}
+.glaeu-info { flex: 1; }
+.glaeu-info .name { font-weight: 700; font-size: .9rem; }
+.glaeu-info .details { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
+.glaeu-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
+.glaeu-form {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  border: 2px dashed var(--border);
+  margin-top: .8rem;
+}
+
+/* ── Gesellschafter ─────────────────────────────────────────────── */
+.ges-list { display: flex; flex-direction: column; gap: .5rem; }
+.ges-item {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--bg); padding: .6rem .8rem; border-radius: var(--radius);
+}
+.ges-item .ges-name { flex: 1; font-weight: 600; font-size: .88rem; }
+.ges-item .ges-anteil { color: var(--gold); font-weight: 700; font-size: .88rem; min-width: 60px; text-align: right; }
+
+/* ── Vermögen ───────────────────────────────────────────────────── */
+.verm-grid { display: flex; flex-direction: column; gap: .5rem; }
+.verm-row {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: center; gap: .8rem;
+  padding: .7rem 1rem;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+.verm-label { font-size: .88rem; font-weight: 600; min-width: 160px; }
+.verm-amount { text-align: right; min-width: 140px; }
+
+/* ── Ausgabe / Step 6 ───────────────────────────────────────────── */
+.output-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+.output-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+  text-align: center;
+  border-top: 3px solid var(--navy);
+  transition: transform .18s;
+}
+.output-card:hover { transform: translateY(-2px); }
+.output-card .icon { font-size: 2.2rem; margin-bottom: .8rem; }
+.output-card h4 { font-size: .95rem; font-weight: 700; margin-bottom: .5rem; }
+.output-card p  { font-size: .8rem; color: var(--muted); margin-bottom: 1rem; }
+.output-card.gold { border-top-color: var(--gold); }
+.output-card.green { border-top-color: var(--green); }
+
+.summary-box {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+}
+.summary-box h4 { font-size: .88rem; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: .8rem; }
+.summary-row {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: .35rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .87rem;
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-row .key   { color: var(--muted); min-width: 160px; }
+.summary-row .val   { font-weight: 600; text-align: right; }
+
+/* ── Wizard Footer Nav ──────────────────────────────────────────── */
+.wizard-nav {
+  position: sticky; bottom: 0;
+  background: var(--white);
+  border-top: 2px solid var(--border);
+  padding: .8rem 1.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .8rem;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 -4px 16px rgba(26,39,68,.08);
+  margin-top: 1rem;
+}
+.nav-info { font-size: .8rem; color: var(--muted); }
+.nav-right { display: flex; gap: .6rem; align-items: center; }
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.modal {
+  background: var(--white);
+  border-radius: var(--radius);
+  padding: 2rem;
+  max-width: 560px; width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+.modal-actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.2rem; }
+
+/* ── Toast ──────────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed; bottom: 5rem; right: 1rem;
+  display: flex; flex-direction: column; gap: .5rem;
+  z-index: 200;
+}
+.toast {
+  background: var(--navy); color: var(--white);
+  padding: .7rem 1.2rem; border-radius: var(--radius);
+  font-size: .85rem; font-weight: 600;
+  box-shadow: var(--shadow);
+  animation: slideIn .25s ease;
+}
+.toast.success { background: var(--green); }
+.toast.error   { background: var(--red); }
+@keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:none; } }
+
+/* ── Autosave Badge ─────────────────────────────────────────────── */
+#autosave-badge {
+  font-size: .72rem; color: var(--muted);
+  position: fixed; bottom: 5.2rem; left: 1rem;
+}
+
+/* ── Code Block ─────────────────────────────────────────────────── */
+.code-block {
+  background: #1e2a3a; color: #e8f0fe;
+  border-radius: var(--radius);
+  padding: 1rem; font-family: monospace; font-size: .82rem;
+  overflow-x: auto; margin: .5rem 0;
+}
+
+@media (max-width: 640px) {
+  .form-row, .form-row-3 { grid-template-columns: 1fr; }
+  .output-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════ VIEW: FALLLISTE ═══════════════ -->
+  <div id="view-list">
+    <header class="app-header">
+      <div class="flex gap-2" style="align-items:center">
+        <h1>⚖️ Insolvenz<span>-Manager</span><span class="header-badge">v2.0</span></h1>
+      </div>
+      <div class="flex gap-2" style="align-items:center">
+        <span id="server-status"><span class="server-dot" id="server-dot"></span><span id="server-label">Offline</span></span>
+      </div>
+    </header>
+
+    <div class="list-toolbar">
+      <h2>Meine Fälle</h2>
+      <input type="text" class="search-box" id="search-input" placeholder="Firma suchen…">
+      <button class="btn btn-outline btn-sm" onclick="openImportModal()">📥 Fragebogen importieren</button>
+      <button class="btn btn-gold" onclick="newCase()">＋ Neuer Fall</button>
+    </div>
+
+    <div class="case-grid" id="case-grid">
+      <div class="empty-state">
+        <div class="icon">📂</div>
+        <p>Keine Fälle vorhanden.<br>Erstellen Sie einen neuen Fall oder importieren Sie einen Fragebogen.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VIEW: WIZARD ═══════════════ -->
+  <div id="view-wizard" class="hidden">
+
+    <div class="wizard-header">
+      <div class="wizard-title">
+        <h2 id="wizard-case-title">Neuer Fall</h2>
+        <span class="wizard-back" onclick="backToList()">← Zur Fallliste</span>
+      </div>
+      <div class="steps-nav" id="steps-nav"></div>
+      <div class="step-labels" id="step-labels"></div>
+    </div>
+
+    <!-- ── Schritt 1: Firmendaten ── -->
+    <div id="step-1" class="step-panel">
+      <div class="form-card">
+        <h3>Firmendaten</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Firma / Unternehmensname <span class="req">*</span></label>
+            <input class="form-control" id="firmaName" placeholder="Muster GmbH">
+          </div>
+          <div class="form-group">
+            <label>Rechtsform <span class="req">*</span></label>
+            <select class="form-control" id="rechtsform">
+              <option>GmbH</option><option>UG (haftungsbeschränkt)</option>
+              <option>AG</option><option>KG</option><option>OHG</option><option>GbR</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Straße <span class="req">*</span></label>
+            <input class="form-control" id="strasse" placeholder="Musterstraße">
+          </div>
+          <div class="form-group">
+            <label>Nr.</label>
+            <input class="form-control" id="hausnummer" placeholder="12a">
+          </div>
+          <div class="form-group">
+            <label>Ort <span class="req">*</span></label>
+            <input class="form-control" id="ort" placeholder="Berlin">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>PLZ <span class="req">*</span></label>
+            <input class="form-control" id="plz" placeholder="10115" maxlength="5">
+          </div>
+          <div class="form-group">
+            <label>Telefon</label>
+            <input class="form-control" id="telefon" placeholder="+49 30 …">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>E-Mail</label>
+          <input class="form-control" id="email" type="email" placeholder="info@firma.de">
+        </div>
+        <div class="form-group">
+          <label>Internes Aktenzeichen</label>
+          <input class="form-control" id="aktenzeichen" placeholder="2025-INS-001">
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Handelsregister & Geschäftsführung</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amtsgericht (HR)</label>
+            <input class="form-control" id="hrGericht" placeholder="Amtsgericht Berlin Charlottenburg">
+          </div>
+          <div class="form-group">
+            <label>HRB-Nummer</label>
+            <input class="form-control" id="hrNummer" placeholder="123456 B">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Geschäftsführer / Vertreter <span class="req">*</span></label>
+            <input class="form-control" id="gfName" placeholder="Max Mustermann">
+          </div>
+          <div class="form-group">
+            <label>GF-Funktion</label>
+            <input class="form-control" id="gfFunktion" placeholder="Geschäftsführer">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Anschrift GF (falls abweichend)</label>
+          <input class="form-control" id="gfAnschrift" placeholder="Nur wenn abweichend von Firmenanschrift">
+        </div>
+        <div class="form-group">
+          <label>Stammkapital (€)</label>
+          <input class="form-control" id="stammkapital" type="number" placeholder="25000">
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Gesellschafter</h3>
+        <div class="ges-list" id="ges-list"></div>
+        <div class="flex gap-2 mt-4">
+          <input class="form-control" id="ges-name-input" placeholder="Name des Gesellschafters">
+          <input class="form-control" id="ges-anteil-input" placeholder="Anteil %" style="max-width:100px">
+          <button class="btn btn-outline btn-sm" onclick="addGesellschafter()">＋ Hinzufügen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Schritt 2: Insolvenzgrund ── -->
+    <div id="step-2" class="step-panel hidden">
+      <div class="form-card">
+        <h3>Insolvenzgründe <span class="req">*</span></h3>
+        <div class="check-group">
+          <label class="check-item" id="ci-zahlungsunfaehigkeit">
+            <input type="checkbox" id="cb-zahlungsunfaehigkeit">
+            <div>
+              <div class="label">§ 17 InsO – Zahlungsunfähigkeit</div>
+              <div style="font-size:.78rem;color:var(--muted)">Schuldner kann fällige Zahlungspflichten nicht erfüllen</div>
+            </div>
+          </label>
+          <label class="check-item" id="ci-drohend">
+            <input type="checkbox" id="cb-drohend">
+            <div>
+              <div class="label">§ 18 InsO – Drohende Zahlungsunfähigkeit</div>
+              <div style="font-size:.78rem;color:var(--muted)">Schuldner wird voraussichtlich nicht erfüllen können</div>
+            </div>
+          </label>
+          <label class="check-item" id="ci-ueberschuldung">
+            <input type="checkbox" id="cb-ueberschuldung">
+            <div>
+              <div class="label">§ 19 InsO – Überschuldung</div>
+              <div style="font-size:.78rem;color:var(--muted)">Vermögen deckt bestehende Verbindlichkeiten nicht mehr</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Wirtschaftliche Angaben</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Branche / Wirtschaftszweig <span class="req">*</span></label>
+            <input class="form-control" id="branche" placeholder="Gastronomie, IT-Dienstleistungen …">
+          </div>
+          <div class="form-group">
+            <label>Bevollmächtigter Rechtsanwalt</label>
+            <input class="form-control" id="anwalt" placeholder="RA …">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Steuerberater</label>
+          <input class="form-control" id="steuerberater" placeholder="StB …">
+        </div>
+        <div class="form-group">
+          <label>Sonstige Hinweise</label>
+          <textarea class="form-control" id="hinweise" rows="3" placeholder="Weitere relevante Informationen …"></textarea>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Vermögensübersicht</h3>
+        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem">Angaben können auch aus dem Mandanten-Fragebogen übernommen werden.</p>
+        <div class="verm-grid" id="verm-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── Schritt 3: Betrieb & Mitarbeiter ── -->
+    <div id="step-3" class="step-panel hidden">
+      <div class="form-card">
+        <h3>Betriebsstatus</h3>
+        <div class="form-group">
+          <label>Betrieb derzeit <span class="req">*</span></label>
+          <div class="radio-group">
+            <label class="radio-card selected" id="rc-laufend">
+              <input type="radio" name="betriebStatus" value="laufend" checked>
+              <div class="label">🏭 Laufend</div>
+            </label>
+            <label class="radio-card" id="rc-eingestellt">
+              <input type="radio" name="betriebStatus" value="eingestellt">
+              <div class="label">🚫 Eingestellt</div>
+            </label>
+          </div>
+        </div>
+        <div class="form-group" id="betrieb-datum-group" style="display:none">
+          <label>Eingestellt seit</label>
+          <input class="form-control" id="betriebEingestelltDatum" type="date">
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Mitarbeiter</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Anzahl Mitarbeiter</label>
+            <input class="form-control" id="maAnzahl" type="number" min="0" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Davon in Kurzarbeit</label>
+            <input class="form-control" id="maKurzarbeit" type="number" min="0" placeholder="0">
+          </div>
+        </div>
+
+        <div class="toggle-row">
+          <span class="toggle-label">Sozialversicherungsrückstände vorhanden?</span>
+          <div class="toggle" id="tgl-sv" onclick="toggleField('tgl-sv','sv-details')"></div>
+        </div>
+        <div id="sv-details" class="hidden">
+          <div class="form-row mt-4">
+            <div class="form-group">
+              <label>SV-Rückstände Betrag (€)</label>
+              <input class="form-control" id="svBetrag" type="number" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label>Zeitraum</label>
+              <input class="form-control" id="svZeitraum" placeholder="z.B. Jan–Dez 2024">
+            </div>
+          </div>
+        </div>
+
+        <div class="toggle-row mt-4">
+          <span class="toggle-label">Lohnrückstände vorhanden?</span>
+          <div class="toggle" id="tgl-lohn" onclick="toggleField('tgl-lohn','lohn-details')"></div>
+        </div>
+        <div id="lohn-details" class="hidden">
+          <div class="form-row mt-4">
+            <div class="form-group">
+              <label>Lohnrückstände Betrag (€)</label>
+              <input class="form-control" id="lohnBetrag" type="number" placeholder="0.00">
+            </div>
+            <div class="form-group">
+              <label>Betroffene Monate</label>
+              <input class="form-control" id="lohnZeitraum" placeholder="z.B. Nov–Dez 2024">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Schritt 4: Geschäftsräume ── -->
+    <div id="step-4" class="step-panel hidden">
+      <div class="form-card">
+        <h3>Art der Nutzung</h3>
+        <div class="radio-group">
+          <label class="radio-card" id="rc-eigentuemer">
+            <input type="radio" name="mietePacht" value="eigentuemer">
+            <div class="label">🏠 Eigentümer</div>
+          </label>
+          <label class="radio-card selected" id="rc-miete">
+            <input type="radio" name="mietePacht" value="miete" checked>
+            <div class="label">🔑 Miete</div>
+          </label>
+          <label class="radio-card" id="rc-pacht">
+            <input type="radio" name="mietePacht" value="pacht">
+            <div class="label">📋 Pacht</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-card" id="miete-details">
+        <h3>Vermieter / Verpächter</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Name / Firma des Vermieters</label>
+            <input class="form-control" id="vermieterName" placeholder="Mustermann Immobilien GmbH">
+          </div>
+          <div class="form-group">
+            <label>Monatliche Miete (€)</label>
+            <input class="form-control" id="mieteBetrag" type="number" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Anschrift des Vermieters</label>
+          <input class="form-control" id="vermieterAnschrift" placeholder="Straße, PLZ Ort">
+        </div>
+
+        <div class="form-group mt-4">
+          <label>Kündigungsstand</label>
+          <div class="radio-group">
+            <label class="radio-card selected" id="rc-nicht-gekuendigt">
+              <input type="radio" name="kuendigungStatus" value="nicht_gekuendigt" checked>
+              <div class="label">Nicht gekündigt</div>
+            </label>
+            <label class="radio-card" id="rc-gekuendigt">
+              <input type="radio" name="kuendigungStatus" value="gekuendigt">
+              <div class="label">Gekündigt</div>
+            </label>
+            <label class="radio-card" id="rc-raeumung">
+              <input type="radio" name="kuendigungStatus" value="raeumungsklage">
+              <div class="label">Räumungsklage</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="kuendigung-datum-group" style="display:none">
+          <label>Kündigungsdatum</label>
+          <input class="form-control" id="kuendigungDatum" type="date">
+        </div>
+
+        <div class="toggle-row mt-4">
+          <span class="toggle-label">Mietrückstände vorhanden?</span>
+          <div class="toggle" id="tgl-miete" onclick="toggleField('tgl-miete','miete-rueck-details')"></div>
+        </div>
+        <div id="miete-rueck-details" class="hidden mt-4">
+          <div class="form-group">
+            <label>Rückstände Betrag (€)</label>
+            <input class="form-control" id="mietRueckstaendeBetrag" type="number" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="toggle-row mt-4">
+          <span class="toggle-label">Vermieterpfandrecht geltend gemacht?</span>
+          <div class="toggle" id="tgl-pfandrecht" onclick="toggleSingle('tgl-pfandrecht')"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Schritt 5: Gläubiger ── -->
+    <div id="step-5" class="step-panel hidden">
+      <div class="form-card">
+        <h3>Gläubigerliste</h3>
+        <div class="flex gap-2" style="margin-bottom:1rem;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="showGlaeubigerForm()">＋ Gläubiger hinzufügen</button>
+          <label class="btn btn-outline btn-sm" style="cursor:pointer">
+            📊 Excel importieren
+            <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event)">
+          </label>
+        </div>
+
+        <div id="glaeu-form-container" class="hidden">
+          <div class="glaeu-form">
+            <h4 style="font-size:.88rem;font-weight:700;margin-bottom:.8rem" id="glaeu-form-title">Neuer Gläubiger</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Name / Firma <span class="req">*</span></label>
+                <input class="form-control" id="gf-name" placeholder="Finanzamt Berlin">
+              </div>
+              <div class="form-group">
+                <label>Forderungsgrund</label>
+                <input class="form-control" id="gf-grund" placeholder="Umsatzsteuer, Miete …">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Anschrift (Straße, Hausnr.)</label>
+              <input class="form-control" id="gf-anschrift" placeholder="Straße 1">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>PLZ</label>
+                <input class="form-control" id="gf-plz" placeholder="10115">
+              </div>
+              <div class="form-group">
+                <label>Ort</label>
+                <input class="form-control" id="gf-ort" placeholder="Berlin">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Hauptforderung (€)</label>
+                <input class="form-control" id="gf-hauptforderung" type="number" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label>Zinsen (€)</label>
+                <input class="form-control" id="gf-zinsen" type="number" placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label>Kosten (€)</label>
+                <input class="form-control" id="gf-kosten" type="number" placeholder="0.00">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Vertreter / Anwalt des Gläubigers</label>
+              <input class="form-control" id="gf-vertreter" placeholder="RA …">
+            </div>
+            <div class="flex gap-2 mt-4">
+              <button class="btn btn-primary" onclick="saveGlaeubigerForm()">💾 Speichern</button>
+              <button class="btn btn-outline" onclick="cancelGlaeubigerForm()">Abbrechen</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="glaeu-list mt-4" id="glaeu-list">
+          <p style="color:var(--muted);font-size:.85rem">Noch keine Gläubiger eingetragen.</p>
+        </div>
+
+        <div class="summary-box mt-8" id="glaeu-summary" style="display:none">
+          <div class="summary-row">
+            <span class="key">Anzahl Gläubiger</span>
+            <span class="val" id="sum-anzahl">0</span>
+          </div>
+          <div class="summary-row">
+            <span class="key">Summe Hauptforderungen</span>
+            <span class="val" id="sum-haupt">0,00 €</span>
+          </div>
+          <div class="summary-row">
+            <span class="key">Summe Gesamt</span>
+            <span class="val" id="sum-gesamt">0,00 €</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Schritt 6: Ausgabe ── -->
+    <div id="step-6" class="step-panel hidden">
+      <div class="form-card">
+        <h3>Zusammenfassung</h3>
+        <div id="summary-content"></div>
+      </div>
+
+      <div class="form-card">
+        <h3>Fallstatus</h3>
+        <div class="form-group">
+          <label>Status setzen</label>
+          <select class="form-control" id="fallStatus">
+            <option value="neu">Neu</option>
+            <option value="in_bearbeitung">In Bearbeitung</option>
+            <option value="eingereicht">Eingereicht</option>
+            <option value="abgeschlossen">Abgeschlossen</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notizen / Bearbeitungsvermerke</label>
+          <textarea class="form-control" id="notizen" rows="4" placeholder="Interne Notizen zum Fall …"></textarea>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <h3>Dateien &amp; Skripte</h3>
+        <div class="output-grid">
+          <div class="output-card gold">
+            <div class="icon">📄</div>
+            <h4>data.json</h4>
+            <p>Alle Falldaten als JSON für die Python-Skripte</p>
+            <button class="btn btn-gold w-full" onclick="downloadJson()">⬇ Herunterladen</button>
+          </div>
+          <div class="output-card">
+            <div class="icon">📋</div>
+            <h4>PDF-Formular befüllen</h4>
+            <p>AG Charlottenburg Formular automatisch ausfüllen</p>
+            <button class="btn btn-outline w-full" onclick="showPdfHint()">Anleitung anzeigen</button>
+          </div>
+          <div class="output-card green">
+            <div class="icon">✉️</div>
+            <h4>Serienbriefe</h4>
+            <p>Word-Briefe für alle Gläubiger erstellen</p>
+            <button class="btn btn-outline w-full" onclick="showSerienHint()">Anleitung anzeigen</button>
+          </div>
+          <div class="output-card">
+            <div class="icon">🔄</div>
+            <h4>Adobe-Import</h4>
+            <p>Ausgefülltes Adobe-PDF in Daten umwandeln</p>
+            <button class="btn btn-outline w-full" onclick="showAdobeHint()">Anleitung anzeigen</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="hint-box" class="form-card hidden">
+        <h3 id="hint-title"></h3>
+        <div id="hint-content"></div>
+      </div>
+    </div>
+
+    <!-- ── Wizard Navigation ── -->
+    <div class="wizard-nav">
+      <div class="nav-info" id="step-info">Schritt 1 von 6</div>
+      <div class="nav-right">
+        <button class="btn btn-outline" id="btn-prev" onclick="prevStep()" style="display:none">← Zurück</button>
+        <button class="btn btn-outline btn-sm" onclick="saveCase(true)">💾 Speichern</button>
+        <button class="btn btn-primary" id="btn-next" onclick="nextStep()">Weiter →</button>
+        <button class="btn btn-gold" id="btn-finish" onclick="finishCase()" style="display:none">✅ Abschließen</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- ═══════════════ MODAL: IMPORT ═══════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>📥 Mandanten-Fragebogen importieren</h3>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">
+      Laden Sie die JSON-Datei hoch oder fügen Sie den kodierten Block aus der E-Mail ein.
+    </p>
+    <div class="form-group">
+      <label>JSON-Datei hochladen</label>
+      <input type="file" class="form-control" id="import-file" accept=".json">
+    </div>
+    <div class="form-group">
+      <label>— oder — Text aus E-Mail einfügen</label>
+      <textarea class="form-control" id="import-text" rows="6"
+        placeholder="Alles einfügen inkl. ===INSOLVENZ-START=== … ===INSOLVENZ-ENDE==="></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-gold" onclick="doImport()">Importieren</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL: BESTÄTIGUNG ═══════════════ -->
+<div id="confirm-overlay" class="modal-overlay hidden" onclick="if(event.target===this)closeConfirm()">
+  <div class="modal">
+    <h3 id="confirm-title">Bestätigung</h3>
+    <p id="confirm-message" style="margin-bottom:1rem"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeConfirm()">Abbrechen</button>
+      <button class="btn btn-danger" id="confirm-ok" onclick="">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="autosave-badge"></div>
+
+<script>
+"use strict";
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+
+const STEPS = [
+  { label: "Firmendaten",    title: "Schritt 1 – Firmendaten & Handelsregister" },
+  { label: "Insolvenzgrund", title: "Schritt 2 – Insolvenzgrund & Wirtschaft" },
+  { label: "Betrieb",        title: "Schritt 3 – Betrieb & Mitarbeiter" },
+  { label: "Geschäftsräume", title: "Schritt 4 – Geschäftsräume & Mietverhältnis" },
+  { label: "Gläubiger",      title: "Schritt 5 – Gläubigerliste" },
+  { label: "Ausgabe",        title: "Schritt 6 – Zusammenfassung & Ausgabe" },
+];
+
+const VERM_FELDER = [
+  { key: "kasse",          label: "Kassenbestand / Bankguthaben" },
+  { key: "betriebsmittel", label: "Betriebsmittel / Maschinen" },
+  { key: "auftraege",      label: "Laufende Aufträge / Vorräte" },
+  { key: "aussenstaende",  label: "Außenstände / Forderungen" },
+  { key: "beteiligungen",  label: "Beteiligungen" },
+  { key: "grundstuecke",   label: "Grundstücke / Immobilien" },
+  { key: "sonstiges",      label: "Sonstiges Vermögen" },
+];
+
+let state = {
+  serverOnline: false,
+  currentStep: 1,
+  caseId: null,
+  cases: [],
+  editingGlaeubigerIdx: null,
+};
+
+let caseData = newCaseData();
+
+function newCaseData() {
+  return {
+    firmaName: "", rechtsform: "GmbH",
+    strasse: "", hausnummer: "", ort: "", plz: "", telefon: "", email: "",
+    aktenzeichen: "", hrGericht: "", hrNummer: "",
+    gfName: "", gfFunktion: "Geschäftsführer", gfAnschrift: "", stammkapital: "",
+    gesellschafter: [],
+    insolvenzgruende: [],
+    branche: "", anwalt: "", steuerberater: "", hinweise: "",
+    vermoegen: VERM_FELDER.reduce((o,f) => { o[f.key]={vorhanden:false,betrag:""}; return o; }, {}),
+    betriebStatus: "laufend", betriebEingestelltDatum: "",
+    maAnzahl: "", maKurzarbeit: "",
+    svRueckstaende: false, svBetrag: "", svZeitraum: "",
+    lohnRueckstaende: false, lohnBetrag: "", lohnZeitraum: "",
+    mietePacht: "miete",
+    vermieterName: "", vermieterAnschrift: "", mieteBetrag: "",
+    kuendigungStatus: "nicht_gekuendigt", kuendigungDatum: "",
+    mietRueckstaendeBetrag: "", vermieterpfandrecht: false,
+    glaeubiger: [],
+    _status: "neu", notizen: "",
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════
+
+document.addEventListener("DOMContentLoaded", async () => {
+  buildVermoegenGrid();
+  buildStepsNav();
+  setupRadioCards();
+  setupCheckItems();
+  await checkServer();
+  await loadCases();
+});
+
+// ══════════════════════════════════════════════════════════════════
+// SERVER
+// ══════════════════════════════════════════════════════════════════
+
+const API = "http://localhost:5000/api";
+
+async function checkServer() {
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(1500) });
+    if (r.ok) {
+      state.serverOnline = true;
+      document.getElementById("server-dot").classList.add("online");
+      document.getElementById("server-label").textContent = "Server aktiv";
+    }
+  } catch {
+    state.serverOnline = false;
+  }
+}
+
+async function apiFetch(path, opts = {}) {
+  const r = await fetch(`${API}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  return r.json();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CASE LIST
+// ══════════════════════════════════════════════════════════════════
+
+async function loadCases() {
+  if (state.serverOnline) {
+    try {
+      state.cases = await apiFetch("/cases");
+    } catch { state.cases = loadLocalCases(); }
+  } else {
+    state.cases = loadLocalCases();
+  }
+  renderCaseList();
+}
+
+function loadLocalCases() {
+  try { return JSON.parse(localStorage.getItem("im_cases") || "[]"); } catch { return []; }
+}
+
+function saveLocalCase(caseObj) {
+  const cases = loadLocalCases();
+  const idx = cases.findIndex(c => c.id === caseObj.id);
+  if (idx >= 0) cases[idx] = caseObj; else cases.unshift(caseObj);
+  localStorage.setItem("im_cases", JSON.stringify(cases));
+}
+
+function renderCaseList(filter = "") {
+  const grid = document.getElementById("case-grid");
+  const visible = state.cases.filter(c =>
+    !filter || c.firma_name?.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  if (!visible.length) {
+    grid.innerHTML = `<div class="empty-state"><div class="icon">📂</div>
+      <p>Keine Fälle gefunden.<br>Erstellen Sie einen neuen Fall oder importieren Sie einen Fragebogen.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = visible.map(c => `
+    <div class="case-card status-${c.status||'neu'}" onclick="openCase(${c.id})">
+      <h3>${esc(c.firma_name || "Unbenannt")}</h3>
+      <div class="meta">${esc(c.rechtsform||'')} · ${esc(c.aktenzeichen||'Kein AZ')}</div>
+      <div class="meta">Geändert: ${fmtDate(c.geaendert||c.updated_at||c.erstellt)}</div>
+      <div><span class="status-pill ${c.status||'neu'}">${statusLabel(c.status)}</span></div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openCase(${c.id})">✏️ Bearbeiten</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();exportCase(${c.id})">⬇ JSON</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();confirmDelete(${c.id})">🗑</button>
+      </div>
+    </div>`).join("");
+}
+
+document.getElementById("search-input").addEventListener("input", e => renderCaseList(e.target.value));
+
+function statusLabel(s) {
+  return { neu:"Neu", in_bearbeitung:"In Bearbeitung", eingereicht:"Eingereicht", abgeschlossen:"Abgeschlossen" }[s] || s || "Neu";
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CASE CRUD
+// ══════════════════════════════════════════════════════════════════
+
+function newCase() {
+  caseData = newCaseData();
+  state.caseId = null;
+  state.currentStep = 1;
+  showWizard();
+}
+
+async function openCase(id) {
+  let c;
+  if (state.serverOnline) {
+    try { c = await apiFetch(`/cases/${id}`); } catch { c = null; }
+  }
+  if (!c) {
+    const local = loadLocalCases().find(x => x.id === id);
+    if (local) c = { ...local, daten: typeof local.daten === 'string' ? JSON.parse(local.daten) : (local.daten || local) };
+  }
+  if (!c) { toast("Fall nicht gefunden", "error"); return; }
+
+  state.caseId = c.id;
+  caseData = { ...newCaseData(), ...(c.daten || c) };
+  state.currentStep = 1;
+  showWizard();
+  formToUI();
+}
+
+async function saveCase(silent = false) {
+  uiToForm();
+  caseData._status = document.getElementById("fallStatus")?.value || caseData._status;
+  caseData.notizen = document.getElementById("notizen")?.value || caseData.notizen;
+  caseData.aktenzeichen = document.getElementById("aktenzeichen")?.value || caseData.aktenzeichen;
+
+  let saved;
+  if (state.serverOnline) {
+    try {
+      if (state.caseId) {
+        saved = await apiFetch(`/cases/${state.caseId}`, { method: "PUT", body: JSON.stringify(caseData) });
+      } else {
+        saved = await apiFetch("/cases", { method: "POST", body: JSON.stringify(caseData) });
+        state.caseId = saved.id;
+      }
+      state.cases = await apiFetch("/cases");
+    } catch { saved = null; }
+  }
+
+  // LocalStorage fallback / sync
+  const localCase = {
+    id: state.caseId || Date.now(),
+    firma_name: caseData.firmaName,
+    rechtsform: caseData.rechtsform,
+    status: caseData._status,
+    aktenzeichen: caseData.aktenzeichen,
+    geaendert: new Date().toISOString(),
+    daten: caseData,
+  };
+  if (!state.caseId) state.caseId = localCase.id;
+  saveLocalCase(localCase);
+  if (!state.serverOnline) {
+    state.cases = loadLocalCases();
+  }
+
+  localStorage.setItem("im_autosave", JSON.stringify({ id: state.caseId, data: caseData, ts: Date.now() }));
+  document.getElementById("autosave-badge").textContent = `Autosave: ${new Date().toLocaleTimeString('de')}`;
+
+  if (!silent) toast("Fall gespeichert ✓", "success");
+}
+
+async function deleteCase(id) {
+  if (state.serverOnline) {
+    try { await apiFetch(`/cases/${id}`, { method: "DELETE" }); } catch {}
+  }
+  const cases = loadLocalCases().filter(c => c.id !== id);
+  localStorage.setItem("im_cases", JSON.stringify(cases));
+  state.cases = state.serverOnline ? (await apiFetch("/cases").catch(() => cases)) : cases;
+  renderCaseList();
+  toast("Fall gelöscht");
+}
+
+async function exportCase(id) {
+  if (state.serverOnline) {
+    window.open(`${API}/cases/${id}/export`, "_blank");
+    return;
+  }
+  const local = loadLocalCases().find(c => c.id === id);
+  if (!local) return;
+  const daten = local.daten || local;
+  downloadBlob(JSON.stringify(daten, null, 2), `data_${local.firma_name||id}.json`, "application/json");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// WIZARD
+// ══════════════════════════════════════════════════════════════════
+
+function showWizard() {
+  document.getElementById("view-list").classList.add("hidden");
+  document.getElementById("view-wizard").classList.remove("hidden");
+  gotoStep(state.currentStep);
+  updateAutosave();
+}
+
+function backToList() {
+  document.getElementById("view-wizard").classList.add("hidden");
+  document.getElementById("view-list").classList.remove("hidden");
+  loadCases();
+}
+
+function buildStepsNav() {
+  const nav = document.getElementById("steps-nav");
+  const labels = document.getElementById("step-labels");
+  nav.innerHTML = STEPS.map((s,i) =>
+    `<div class="step-dot" id="dot-${i+1}" onclick="gotoStepSafe(${i+1})" title="${s.label}"></div>`
+  ).join("");
+  labels.innerHTML = `<span>${STEPS[0].label}</span><span>${STEPS[STEPS.length-1].label}</span>`;
+}
+
+function gotoStep(n) {
+  state.currentStep = n;
+  document.querySelectorAll(".step-panel").forEach((p,i) => {
+    p.classList.toggle("hidden", i+1 !== n);
+  });
+  document.querySelectorAll(".step-dot").forEach((d,i) => {
+    d.classList.toggle("active", i+1 === n);
+    d.classList.toggle("done", i+1 < n);
+  });
+  document.getElementById("step-info").textContent = `Schritt ${n} von ${STEPS.length}`;
+  document.getElementById("wizard-case-title").textContent =
+    (caseData.firmaName || "Neuer Fall") + " – " + STEPS[n-1].title;
+  document.getElementById("btn-prev").style.display = n > 1 ? "" : "none";
+  document.getElementById("btn-next").style.display = n < STEPS.length ? "" : "none";
+  document.getElementById("btn-finish").style.display = n === STEPS.length ? "" : "none";
+  if (n === STEPS.length) buildSummary();
+  window.scrollTo(0,0);
+}
+
+function gotoStepSafe(n) {
+  if (n < state.currentStep || validateStep(state.currentStep, true)) gotoStep(n);
+}
+
+function nextStep() {
+  if (!validateStep(state.currentStep)) return;
+  uiToForm();
+  if (state.currentStep < STEPS.length) gotoStep(state.currentStep + 1);
+  saveCase(true);
+}
+
+function prevStep() {
+  uiToForm();
+  if (state.currentStep > 1) gotoStep(state.currentStep - 1);
+}
+
+async function finishCase() {
+  uiToForm();
+  caseData._status = document.getElementById("fallStatus").value;
+  caseData.notizen = document.getElementById("notizen").value;
+  await saveCase(false);
+  toast("Fall erfolgreich gespeichert!", "success");
+  setTimeout(backToList, 1200);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VALIDATION
+// ══════════════════════════════════════════════════════════════════
+
+const REQUIRED = {
+  1: [["firmaName","Firmenname ist erforderlich"],["gfName","Name des GF ist erforderlich"]],
+  2: [],
+  3: [],
+  4: [],
+  5: [],
+  6: [],
+};
+
+function validateStep(step, silent = false) {
+  let ok = true;
+  document.querySelectorAll(".form-control.error").forEach(el => el.classList.remove("error"));
+  document.querySelectorAll(".field-error").forEach(el => el.remove());
+
+  if (step === 2) {
+    const gruende = ["cb-zahlungsunfaehigkeit","cb-drohend","cb-ueberschuldung"].some(id => document.getElementById(id).checked);
+    if (!gruende) {
+      if (!silent) toast("Bitte mindestens einen Insolvenzgrund auswählen", "error");
+      return false;
+    }
+  }
+
+  for (const [id, msg] of (REQUIRED[step] || [])) {
+    const el = document.getElementById(id);
+    if (el && !el.value.trim()) {
+      el.classList.add("error");
+      const err = document.createElement("div");
+      err.className = "field-error";
+      err.textContent = msg;
+      el.after(err);
+      ok = false;
+    }
+  }
+  if (!ok && !silent) toast("Bitte alle Pflichtfelder ausfüllen", "error");
+  return ok;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DATA SYNC (UI ↔ caseData)
+// ══════════════════════════════════════════════════════════════════
+
+function uiToForm() {
+  const g = id => document.getElementById(id)?.value || "";
+  const b = id => document.getElementById(id)?.checked || false;
+
+  Object.assign(caseData, {
+    firmaName: g("firmaName"), rechtsform: g("rechtsform"),
+    strasse: g("strasse"), hausnummer: g("hausnummer"), ort: g("ort"), plz: g("plz"),
+    telefon: g("telefon"), email: g("email"), aktenzeichen: g("aktenzeichen"),
+    hrGericht: g("hrGericht"), hrNummer: g("hrNummer"),
+    gfName: g("gfName"), gfFunktion: g("gfFunktion"), gfAnschrift: g("gfAnschrift"),
+    stammkapital: g("stammkapital"),
+    insolvenzgruende: ["zahlungsunfaehigkeit","drohend","ueberschuldung"].filter(k => b("cb-"+k)),
+    branche: g("branche"), anwalt: g("anwalt"), steuerberater: g("steuerberater"), hinweise: g("hinweise"),
+    betriebStatus: document.querySelector('input[name="betriebStatus"]:checked')?.value || "laufend",
+    betriebEingestelltDatum: g("betriebEingestelltDatum"),
+    maAnzahl: g("maAnzahl"), maKurzarbeit: g("maKurzarbeit"),
+    svRueckstaende: document.getElementById("tgl-sv")?.classList.contains("on"),
+    svBetrag: g("svBetrag"), svZeitraum: g("svZeitraum"),
+    lohnRueckstaende: document.getElementById("tgl-lohn")?.classList.contains("on"),
+    lohnBetrag: g("lohnBetrag"), lohnZeitraum: g("lohnZeitraum"),
+    mietePacht: document.querySelector('input[name="mietePacht"]:checked')?.value || "miete",
+    vermieterName: g("vermieterName"), vermieterAnschrift: g("vermieterAnschrift"), mieteBetrag: g("mieteBetrag"),
+    kuendigungStatus: document.querySelector('input[name="kuendigungStatus"]:checked')?.value || "nicht_gekuendigt",
+    kuendigungDatum: g("kuendigungDatum"),
+    mietRueckstaendeBetrag: g("mietRueckstaendeBetrag"),
+    vermieterpfandrecht: document.getElementById("tgl-pfandrecht")?.classList.contains("on"),
+    _status: g("fallStatus") || caseData._status,
+    notizen: g("notizen"),
+  });
+
+  // Vermögen
+  VERM_FELDER.forEach(f => {
+    const cb = document.getElementById(`verm-cb-${f.key}`);
+    const amt = document.getElementById(`verm-amt-${f.key}`);
+    if (cb) caseData.vermoegen[f.key] = { vorhanden: cb.checked, betrag: amt?.value || "" };
+  });
+}
+
+function formToUI() {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ""; };
+  const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+  const setToggle = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.toggle("on", !!val); }
+  };
+
+  set("firmaName", caseData.firmaName); set("rechtsform", caseData.rechtsform);
+  set("strasse", caseData.strasse); set("hausnummer", caseData.hausnummer);
+  set("ort", caseData.ort); set("plz", caseData.plz);
+  set("telefon", caseData.telefon); set("email", caseData.email);
+  set("aktenzeichen", caseData.aktenzeichen);
+  set("hrGericht", caseData.hrGericht); set("hrNummer", caseData.hrNummer);
+  set("gfName", caseData.gfName); set("gfFunktion", caseData.gfFunktion);
+  set("gfAnschrift", caseData.gfAnschrift); set("stammkapital", caseData.stammkapital);
+  set("branche", caseData.branche); set("anwalt", caseData.anwalt);
+  set("steuerberater", caseData.steuerberater); set("hinweise", caseData.hinweise);
+  set("betriebEingestelltDatum", caseData.betriebEingestelltDatum);
+  set("maAnzahl", caseData.maAnzahl); set("maKurzarbeit", caseData.maKurzarbeit);
+  set("svBetrag", caseData.svBetrag); set("svZeitraum", caseData.svZeitraum);
+  set("lohnBetrag", caseData.lohnBetrag); set("lohnZeitraum", caseData.lohnZeitraum);
+  set("vermieterName", caseData.vermieterName);
+  set("vermieterAnschrift", caseData.vermieterAnschrift); set("mieteBetrag", caseData.mieteBetrag);
+  set("kuendigungDatum", caseData.kuendigungDatum);
+  set("mietRueckstaendeBetrag", caseData.mietRueckstaendeBetrag);
+  set("fallStatus", caseData._status);
+  set("notizen", caseData.notizen);
+
+  // Checkboxen
+  (caseData.insolvenzgruende || []).forEach(k => setCheck("cb-"+k, true));
+  document.querySelectorAll('.check-item').forEach(el => {
+    const cb = el.querySelector('input[type=checkbox]');
+    if (cb) el.classList.toggle("checked", cb.checked);
+  });
+
+  // Radios
+  setRadio("betriebStatus", caseData.betriebStatus || "laufend");
+  setRadio("mietePacht", caseData.mietePacht || "miete");
+  setRadio("kuendigungStatus", caseData.kuendigungStatus || "nicht_gekuendigt");
+
+  // Toggles
+  setToggle("tgl-sv", caseData.svRueckstaende);
+  setToggle("tgl-lohn", caseData.lohnRueckstaende);
+  setToggle("tgl-miete", caseData.mietRueckstaendeBetrag > 0);
+  setToggle("tgl-pfandrecht", caseData.vermieterpfandrecht);
+
+  // Bedingte Sichtbarkeit
+  document.getElementById("sv-details")?.classList.toggle("hidden", !caseData.svRueckstaende);
+  document.getElementById("lohn-details")?.classList.toggle("hidden", !caseData.lohnRueckstaende);
+  document.getElementById("miete-rueck-details")?.classList.toggle("hidden", !caseData.mietRueckstaendeBetrag);
+  document.getElementById("betrieb-datum-group").style.display = caseData.betriebStatus === "eingestellt" ? "" : "none";
+  document.getElementById("kuendigung-datum-group").style.display = caseData.kuendigungStatus !== "nicht_gekuendigt" ? "" : "none";
+
+  // Vermögen
+  VERM_FELDER.forEach(f => {
+    const v = caseData.vermoegen?.[f.key] || {};
+    const cb = document.getElementById(`verm-cb-${f.key}`);
+    const amt = document.getElementById(`verm-amt-${f.key}`);
+    if (cb) cb.checked = !!v.vorhanden;
+    if (amt) { amt.value = v.betrag || ""; amt.disabled = !v.vorhanden; }
+  });
+
+  renderGesellschafter();
+  renderGlaeubiger();
+  updateRadioCards();
+}
+
+function setRadio(name, val) {
+  const el = document.querySelector(`input[name="${name}"][value="${val}"]`);
+  if (el) el.checked = true;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RADIO CARDS
+// ══════════════════════════════════════════════════════════════════
+
+function setupRadioCards() {
+  document.querySelectorAll('.radio-card input[type=radio]').forEach(input => {
+    input.addEventListener("change", () => {
+      updateRadioCards();
+      handleRadioChange(input.name, input.value);
+    });
+  });
+}
+
+function updateRadioCards() {
+  document.querySelectorAll('.radio-group').forEach(group => {
+    group.querySelectorAll('.radio-card').forEach(card => {
+      const inp = card.querySelector('input[type=radio]');
+      card.classList.toggle("selected", inp && inp.checked);
+    });
+  });
+}
+
+function handleRadioChange(name, val) {
+  if (name === "betriebStatus") {
+    document.getElementById("betrieb-datum-group").style.display = val === "eingestellt" ? "" : "none";
+  }
+  if (name === "mietePacht") {
+    document.getElementById("miete-details").style.display = val === "eigentuemer" ? "none" : "";
+  }
+  if (name === "kuendigungStatus") {
+    document.getElementById("kuendigung-datum-group").style.display = val !== "nicht_gekuendigt" ? "" : "none";
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHECK ITEMS
+// ══════════════════════════════════════════════════════════════════
+
+function setupCheckItems() {
+  document.querySelectorAll('.check-item').forEach(el => {
+    const cb = el.querySelector('input[type=checkbox]');
+    if (!cb) return;
+    cb.addEventListener("change", () => el.classList.toggle("checked", cb.checked));
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TOGGLE
+// ══════════════════════════════════════════════════════════════════
+
+function toggleField(toggleId, detailId) {
+  const tgl = document.getElementById(toggleId);
+  const det = document.getElementById(detailId);
+  tgl.classList.toggle("on");
+  det.classList.toggle("hidden", !tgl.classList.contains("on"));
+}
+
+function toggleSingle(toggleId) {
+  document.getElementById(toggleId).classList.toggle("on");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GESELLSCHAFTER
+// ══════════════════════════════════════════════════════════════════
+
+function addGesellschafter() {
+  const name = document.getElementById("ges-name-input").value.trim();
+  const anteil = document.getElementById("ges-anteil-input").value.trim();
+  if (!name) return;
+  caseData.gesellschafter.push({ name, anteil: anteil || "?" });
+  document.getElementById("ges-name-input").value = "";
+  document.getElementById("ges-anteil-input").value = "";
+  renderGesellschafter();
+}
+
+function removeGesellschafter(i) {
+  caseData.gesellschafter.splice(i, 1);
+  renderGesellschafter();
+}
+
+function renderGesellschafter() {
+  const list = document.getElementById("ges-list");
+  if (!caseData.gesellschafter.length) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Noch keine Gesellschafter eingetragen.</p>';
+    return;
+  }
+  list.innerHTML = caseData.gesellschafter.map((g,i) => `
+    <div class="ges-item">
+      <span class="ges-name">${esc(g.name)}</span>
+      <span class="ges-anteil">${esc(g.anteil)} %</span>
+      <button class="btn btn-danger btn-icon" onclick="removeGesellschafter(${i})">✕</button>
+    </div>`).join("");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VERMÖGEN
+// ══════════════════════════════════════════════════════════════════
+
+function buildVermoegenGrid() {
+  const grid = document.getElementById("verm-grid");
+  grid.innerHTML = VERM_FELDER.map(f => `
+    <div class="verm-row">
+      <label class="verm-label" for="verm-cb-${f.key}">
+        <input type="checkbox" id="verm-cb-${f.key}" onchange="toggleVermBetrag('${f.key}')">
+        ${f.label}
+      </label>
+      <div style="flex:1"></div>
+      <div class="verm-amount">
+        <input type="number" class="form-control" id="verm-amt-${f.key}" placeholder="0,00" disabled
+          style="max-width:160px;text-align:right">
+      </div>
+    </div>`).join("");
+}
+
+function toggleVermBetrag(key) {
+  const cb = document.getElementById(`verm-cb-${key}`);
+  const amt = document.getElementById(`verm-amt-${key}`);
+  amt.disabled = !cb.checked;
+  if (!cb.checked) amt.value = "";
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GLÄUBIGER
+// ══════════════════════════════════════════════════════════════════
+
+function showGlaeubigerForm(idx = null) {
+  state.editingGlaeubigerIdx = idx;
+  const form = document.getElementById("glaeu-form-container");
+  form.classList.remove("hidden");
+  document.getElementById("glaeu-form-title").textContent = idx !== null ? "Gläubiger bearbeiten" : "Neuer Gläubiger";
+
+  if (idx !== null) {
+    const g = caseData.glaeubiger[idx];
+    ["name","grund","anschrift","plz","ort","hauptforderung","zinsen","kosten","vertreter"].forEach(k => {
+      const el = document.getElementById("gf-"+k);
+      if (el) el.value = g[k] || "";
+    });
+  } else {
+    document.querySelectorAll("#glaeu-form-container .form-control").forEach(el => el.value = "");
+  }
+}
+
+function cancelGlaeubigerForm() {
+  document.getElementById("glaeu-form-container").classList.add("hidden");
+  state.editingGlaeubigerIdx = null;
+}
+
+function saveGlaeubigerForm() {
+  const g = id => document.getElementById("gf-"+id)?.value?.trim() || "";
+  const name = g("name");
+  if (!name) { toast("Name des Gläubigers fehlt", "error"); return; }
+  const obj = {
+    name, grund: g("grund"), anschrift: g("anschrift"),
+    plz: g("plz"), ort: g("ort"),
+    hauptforderung: parseFloat(g("hauptforderung")) || 0,
+    zinsen: parseFloat(g("zinsen")) || 0,
+    kosten: parseFloat(g("kosten")) || 0,
+    vertreter: g("vertreter"),
+  };
+  if (state.editingGlaeubigerIdx !== null) {
+    caseData.glaeubiger[state.editingGlaeubigerIdx] = obj;
+  } else {
+    caseData.glaeubiger.push(obj);
+  }
+  cancelGlaeubigerForm();
+  renderGlaeubiger();
+}
+
+function removeGlaeu(i) {
+  caseData.glaeubiger.splice(i, 1);
+  renderGlaeubiger();
+}
+
+function renderGlaeubiger() {
+  const list = document.getElementById("glaeu-list");
+  if (!caseData.glaeubiger.length) {
+    list.innerHTML = '<p style="color:var(--muted);font-size:.85rem">Noch keine Gläubiger eingetragen.</p>';
+    document.getElementById("glaeu-summary").style.display = "none";
+    return;
+  }
+
+  list.innerHTML = caseData.glaeubiger.map((g,i) => `
+    <div class="glaeu-item">
+      <div class="glaeu-info">
+        <div class="name">${esc(g.name)}</div>
+        <div class="details">${esc(g.anschrift||'')} ${esc(g.plz||'')} ${esc(g.ort||'')} · ${esc(g.grund||'')}</div>
+        <div class="details" style="margin-top:.2rem">
+          HF: ${fmtEur(g.hauptforderung)} · Zinsen: ${fmtEur(g.zinsen)} · Kosten: ${fmtEur(g.kosten)}
+          <strong> = ${fmtEur((g.hauptforderung||0)+(g.zinsen||0)+(g.kosten||0))}</strong>
+        </div>
+      </div>
+      <div class="glaeu-actions">
+        <button class="btn btn-outline btn-sm" onclick="showGlaeubigerForm(${i})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="removeGlaeu(${i})">✕</button>
+      </div>
+    </div>`).join("");
+
+  const sumHaupt = caseData.glaeubiger.reduce((s,g) => s+(g.hauptforderung||0), 0);
+  const sumGes   = caseData.glaeubiger.reduce((s,g) => s+(g.hauptforderung||0)+(g.zinsen||0)+(g.kosten||0), 0);
+  document.getElementById("glaeu-summary").style.display = "";
+  document.getElementById("sum-anzahl").textContent = caseData.glaeubiger.length;
+  document.getElementById("sum-haupt").textContent = fmtEur(sumHaupt);
+  document.getElementById("sum-gesamt").textContent = fmtEur(sumGes);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EXCEL IMPORT
+// ══════════════════════════════════════════════════════════════════
+
+function importExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      if (!rows.length) { toast("Keine Zeilen gefunden", "error"); return; }
+
+      const MAP = {
+        name: ["name","firma","gläubiger","kreditor","Name","Gläubiger"],
+        anschrift: ["straße","strasse","anschrift","adresse","Straße","Anschrift"],
+        plz: ["plz","PLZ","postleitzahl"],
+        ort: ["ort","Ort","stadt","Stadt"],
+        grund: ["grund","forderungsgrund","beschreibung","Forderungsgrund"],
+        hauptforderung: ["hauptforderung","forderung","betrag","Hauptforderung","Forderung","Betrag"],
+        zinsen: ["zinsen","Zinsen","zins"],
+        kosten: ["kosten","Kosten"],
+        vertreter: ["vertreter","anwalt","Vertreter"],
+      };
+
+      const mapKey = (row, aliases) => {
+        for (const a of aliases) { if (row[a] !== undefined) return String(row[a]); }
+        return "";
+      };
+
+      let imported = 0;
+      rows.forEach(row => {
+        const name = mapKey(row, MAP.name);
+        if (!name) return;
+        caseData.glaeubiger.push({
+          name, anschrift: mapKey(row, MAP.anschrift),
+          plz: mapKey(row, MAP.plz), ort: mapKey(row, MAP.ort),
+          grund: mapKey(row, MAP.grund),
+          hauptforderung: parseFloat(mapKey(row, MAP.hauptforderung)) || 0,
+          zinsen: parseFloat(mapKey(row, MAP.zinsen)) || 0,
+          kosten: parseFloat(mapKey(row, MAP.kosten)) || 0,
+          vertreter: mapKey(row, MAP.vertreter),
+        });
+        imported++;
+      });
+      renderGlaeubiger();
+      toast(`${imported} Gläubiger importiert ✓`, "success");
+    } catch(err) {
+      toast("Fehler beim Excel-Import: " + err.message, "error");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  event.target.value = "";
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ZUSAMMENFASSUNG
+// ══════════════════════════════════════════════════════════════════
+
+function buildSummary() {
+  uiToForm();
+  const rows = [
+    ["Firma", caseData.firmaName],
+    ["Rechtsform", caseData.rechtsform],
+    ["Adresse", [caseData.strasse, caseData.hausnummer, caseData.plz, caseData.ort].filter(Boolean).join(" ")],
+    ["Handelsregister", caseData.hrNummer ? `${caseData.hrGericht} · ${caseData.hrNummer}` : "–"],
+    ["Geschäftsführer", caseData.gfName],
+    ["Insolvenzgründe", (caseData.insolvenzgruende||[]).map(k => ({zahlungsunfaehigkeit:"§ 17 Zahlungsunfähigkeit",drohend:"§ 18 Drohend",ueberschuldung:"§ 19 Überschuldung"}[k])).join(", ") || "–"],
+    ["Branche", caseData.branche || "–"],
+    ["Betrieb", caseData.betriebStatus === "eingestellt" ? `Eingestellt (${caseData.betriebEingestelltDatum||"??"})` : "Laufend"],
+    ["Mitarbeiter", caseData.maAnzahl || "0"],
+    ["Geschäftsräume", caseData.mietePacht === "eigentuemer" ? "Eigentümer" : (caseData.mietePacht === "miete" ? "Miete" : "Pacht")],
+    ["Gläubiger", `${caseData.glaeubiger.length} eingetragen`],
+    ["Gesamtforderungen", fmtEur(caseData.glaeubiger.reduce((s,g)=>s+(g.hauptforderung||0)+(g.zinsen||0)+(g.kosten||0),0))],
+  ];
+
+  document.getElementById("summary-content").innerHTML =
+    `<div class="summary-box">${rows.map(([k,v]) =>
+      `<div class="summary-row"><span class="key">${esc(k)}</span><span class="val">${esc(v||"–")}</span></div>`
+    ).join("")}</div>`;
+
+  document.getElementById("fallStatus").value = caseData._status || "in_bearbeitung";
+  document.getElementById("notizen").value = caseData.notizen || "";
+}
+
+// ══════════════════════════════════════════════════════════════════
+// OUTPUT / HINTS
+// ══════════════════════════════════════════════════════════════════
+
+function downloadJson() {
+  uiToForm();
+  downloadBlob(JSON.stringify(caseData, null, 2), "data.json", "application/json");
+}
+
+function showPdfHint() { showHint("PDF-Formular befüllen (fill_insolvenz.py)", `
+  <p style="margin-bottom:.8rem">Führen Sie dieses Kommando im Projektordner aus:</p>
+  <div class="code-block">python fill_insolvenz.py originalformular.pdf data.json ausgefuelltes_formular.pdf</div>
+  <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">
+    Voraussetzung: <code>pip install pypdf</code>
+  </p>`);
+}
+
+function showSerienHint() { showHint("Serienbriefe erstellen (serienbriefe.py)", `
+  <p style="margin-bottom:.8rem">Führen Sie dieses Kommando im Projektordner aus:</p>
+  <div class="code-block">python serienbriefe.py data.json</div>
+  <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">
+    Ausgabe: Unterordner <code>Serienbriefe\\</code> mit je einem Word-Dokument pro Gläubiger.<br>
+    Voraussetzung: <code>pip install python-docx</code>
+  </p>`);
+}
+
+function showAdobeHint() { showHint("Adobe-PDF importieren (import_adobe_pdf.py)", `
+  <p style="margin-bottom:.8rem">Wandelt ein ausgefülltes Adobe-PDF in <code>data.json</code> um:</p>
+  <div class="code-block">python import_adobe_pdf.py ausgefuelltes_adobe_formular.pdf data.json</div>
+  <p style="margin-top:.5rem;font-size:.82rem;color:var(--muted)">Funktioniert auch mit XFDF-Dateien:</p>
+  <div class="code-block">python import_adobe_pdf.py formular.xfdf data.json</div>`);
+}
+
+function showHint(title, html) {
+  const box = document.getElementById("hint-box");
+  document.getElementById("hint-title").textContent = title;
+  document.getElementById("hint-content").innerHTML = html;
+  box.classList.remove("hidden");
+  box.scrollIntoView({ behavior: "smooth" });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// IMPORT (FRAGEBOGEN)
+// ══════════════════════════════════════════════════════════════════
+
+function openImportModal() {
+  document.getElementById("modal-overlay").classList.remove("hidden");
+  document.getElementById("import-file").value = "";
+  document.getElementById("import-text").value = "";
+}
+
+function closeModal() {
+  document.getElementById("modal-overlay").classList.add("hidden");
+}
+
+function doImport() {
+  const file = document.getElementById("import-file").files[0];
+  const text = document.getElementById("import-text").value.trim();
+
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = e => { applyImport(e.target.result); };
+    reader.readAsText(file);
+  } else if (text) {
+    let raw = text;
+    const m = text.match(/===INSOLVENZ-START===\s*([\s\S]*?)\s*===INSOLVENZ-ENDE===/);
+    if (m) {
+      try { raw = atob(m[1].replace(/\s/g,"")); } catch { toast("Base64-Dekodierung fehlgeschlagen", "error"); return; }
+    }
+    applyImport(raw);
+  } else {
+    toast("Bitte Datei auswählen oder Text einfügen", "error");
+  }
+}
+
+function applyImport(jsonStr) {
+  try {
+    const imported = JSON.parse(jsonStr);
+    caseData = { ...newCaseData(), ...imported };
+    closeModal();
+    newCase();
+    formToUI();
+    toast("Fragebogen erfolgreich importiert ✓", "success");
+  } catch(e) {
+    toast("JSON-Fehler: " + e.message, "error");
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CONFIRM / DELETE
+// ══════════════════════════════════════════════════════════════════
+
+function confirmDelete(id) {
+  const c = state.cases.find(x => x.id === id);
+  document.getElementById("confirm-title").textContent = "Fall löschen?";
+  document.getElementById("confirm-message").textContent =
+    `Soll der Fall "${c?.firma_name || id}" unwiderruflich gelöscht werden?`;
+  document.getElementById("confirm-ok").onclick = () => { closeConfirm(); deleteCase(id); };
+  document.getElementById("confirm-overlay").classList.remove("hidden");
+}
+
+function closeConfirm() {
+  document.getElementById("confirm-overlay").classList.add("hidden");
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AUTOSAVE
+// ══════════════════════════════════════════════════════════════════
+
+function updateAutosave() {
+  const saved = localStorage.getItem("im_autosave");
+  if (!saved) return;
+  try {
+    const { id, data, ts } = JSON.parse(saved);
+    if (id === state.caseId || !state.caseId) {
+      const age = Math.round((Date.now()-ts)/1000);
+      document.getElementById("autosave-badge").textContent =
+        `Autosave: vor ${age}s (${new Date(ts).toLocaleTimeString('de')})`;
+    }
+  } catch {}
+}
+
+setInterval(() => {
+  if (document.getElementById("view-wizard").classList.contains("hidden")) return;
+  saveCase(true);
+}, 60000); // Autosave every 60s
+
+// ══════════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════════
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function fmtDate(s) {
+  if (!s) return "–";
+  try { return new Date(s).toLocaleDateString("de-DE"); } catch { return s; }
+}
+
+function fmtEur(n) {
+  return Number(n||0).toLocaleString("de-DE", { style:"currency", currency:"EUR" });
+}
+
+function downloadBlob(content, filename, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = filename;
+  a.click();
+}
+
+function toast(msg, type = "") {
+  const el = document.createElement("div");
+  el.className = "toast" + (type ? " " + type : "");
+  el.textContent = msg;
+  document.getElementById("toast-container").appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+</script>
+</body>
+</html>

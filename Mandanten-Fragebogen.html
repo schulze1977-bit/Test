@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Insolvenzfragebogen – Mandant</title>
+<style>
+:root {
+  --navy:  #1a2744;
+  --gold:  #b8922a;
+  --gold2: #d4a94a;
+  --bg:    #f0f4f8;
+  --white: #ffffff;
+  --border:#dce3ee;
+  --muted: #6b7a99;
+  --red:   #c0392b;
+  --green: #27ae60;
+  --r:     12px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--navy);
+  min-height: 100vh;
+  padding-bottom: 100px;
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.header {
+  background: var(--navy);
+  color: white;
+  padding: 1.2rem 1.5rem;
+  text-align: center;
+}
+.header h1 { font-size: 1.3rem; font-weight: 700; }
+.header p  { font-size: .82rem; opacity: .75; margin-top: .3rem; }
+
+/* ── Progress ────────────────────────────────────────────── */
+.progress-wrap {
+  background: var(--white);
+  padding: .8rem 1.2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  position: sticky; top: 0; z-index: 10;
+}
+.progress-bar {
+  height: 6px; background: var(--border);
+  border-radius: 3px; overflow: hidden; margin-bottom: .4rem;
+}
+.progress-fill { height: 100%; background: var(--gold); border-radius: 3px; transition: width .3s; }
+.progress-label { font-size: .75rem; color: var(--muted); text-align: center; }
+
+/* ── Container ────────────────────────────────────────────── */
+.container { max-width: 640px; margin: 0 auto; padding: 1rem; }
+
+/* ── Step ─────────────────────────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+.step-heading {
+  background: var(--white);
+  border-radius: var(--r);
+  padding: 1.2rem 1.4rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  border-left: 4px solid var(--gold);
+}
+.step-heading h2 { font-size: 1.1rem; font-weight: 700; }
+.step-heading p  { font-size: .82rem; color: var(--muted); margin-top: .3rem; }
+
+.card {
+  background: var(--white);
+  border-radius: var(--r);
+  padding: 1.2rem;
+  margin-bottom: .8rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.card h3 {
+  font-size: .88rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .4px;
+  color: var(--muted); margin-bottom: .8rem;
+}
+
+/* ── Form ─────────────────────────────────────────────────── */
+.field { margin-bottom: .9rem; }
+.field label {
+  display: block; font-size: .82rem; font-weight: 600;
+  color: var(--muted); margin-bottom: .3rem;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.field label .req { color: var(--red); }
+.inp {
+  width: 100%; padding: .75rem 1rem;
+  border: 2px solid var(--border); border-radius: var(--r);
+  font-size: 1rem; background: var(--white); outline: none;
+  -webkit-appearance: none; transition: border-color .18s;
+}
+.inp:focus { border-color: var(--navy); }
+.inp.error { border-color: var(--red); }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.row-3 { display: grid; grid-template-columns: 2fr 1fr 2fr; gap: .6rem; }
+
+/* ── Radio Cards ──────────────────────────────────────────── */
+.radio-group { display: flex; gap: .6rem; flex-wrap: wrap; }
+.rc {
+  flex: 1; min-width: 120px; min-height: 56px;
+  border: 2px solid var(--border); border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: .9rem; font-weight: 600;
+  padding: .7rem; text-align: center; transition: all .18s;
+}
+.rc.sel { border-color: var(--navy); background: var(--navy); color: white; }
+.rc input { display: none; }
+
+/* ── Check Cards ──────────────────────────────────────────── */
+.check-card {
+  display: flex; align-items: flex-start; gap: .8rem;
+  padding: .9rem 1rem;
+  border: 2px solid var(--border); border-radius: var(--r);
+  cursor: pointer; margin-bottom: .5rem; transition: border-color .18s;
+}
+.check-card.sel { border-color: var(--navy); background: #f0f3ff; }
+.check-card input { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; accent-color: var(--navy); }
+.check-card .ctitle { font-weight: 700; font-size: .9rem; }
+.check-card .cdesc  { font-size: .78rem; color: var(--muted); margin-top: .1rem; }
+
+/* ── Toggle ───────────────────────────────────────────────── */
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .9rem 1rem;
+  border: 2px solid var(--border); border-radius: var(--r);
+  margin-bottom: .5rem; cursor: pointer;
+}
+.tgl-label { font-weight: 600; font-size: .9rem; }
+.tgl {
+  width: 52px; height: 28px; background: var(--border);
+  border-radius: 14px; position: relative; transition: background .2s; flex-shrink: 0;
+}
+.tgl::after {
+  content:''; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; background: white; border-radius: 50%; transition: transform .2s;
+}
+.tgl.on { background: var(--navy); }
+.tgl.on::after { transform: translateX(24px); }
+
+/* ── Vermögen ─────────────────────────────────────────────── */
+.verm-item {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: .8rem;
+  padding: .7rem .8rem;
+  border-radius: 8px; background: var(--bg);
+  margin-bottom: .4rem;
+}
+.verm-item.active { background: #f0f3ff; }
+.verm-left { display: flex; align-items: center; gap: .7rem; }
+.verm-left input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--navy); }
+.verm-label { font-weight: 600; font-size: .88rem; }
+.verm-amt { max-width: 120px; }
+
+/* ── Gläubiger ────────────────────────────────────────────── */
+.gl-item {
+  background: var(--bg);
+  border-radius: var(--r);
+  padding: 1rem;
+  margin-bottom: .6rem;
+  border-left: 3px solid var(--gold);
+}
+.gl-item h4 { font-size: .88rem; font-weight: 700; margin-bottom: .6rem; color: var(--navy); }
+.gl-item .del-btn {
+  float: right; background: var(--red); color: white;
+  border: none; border-radius: 6px; padding: .25rem .6rem;
+  font-size: .78rem; cursor: pointer;
+}
+
+/* ── Summary ──────────────────────────────────────────────── */
+.sum-row {
+  display: flex; justify-content: space-between;
+  padding: .5rem 0; border-bottom: 1px solid var(--border);
+  font-size: .87rem;
+}
+.sum-row:last-child { border-bottom: none; }
+.sum-row .k { color: var(--muted); }
+.sum-row .v { font-weight: 700; }
+
+/* ── Footer Nav ───────────────────────────────────────────── */
+.footer-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--white);
+  border-top: 2px solid var(--border);
+  padding: .8rem 1.2rem;
+  display: flex; gap: .6rem;
+  box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+  z-index: 20;
+}
+.btn {
+  flex: 1; min-height: 52px;
+  border: none; border-radius: var(--r);
+  font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: all .18s;
+}
+.btn-back    { background: var(--border); color: var(--navy); }
+.btn-next    { background: var(--navy); color: white; }
+.btn-send    { background: var(--gold); color: white; }
+.btn:disabled { opacity: .5; }
+
+/* ── Error ────────────────────────────────────────────────── */
+.err-msg { font-size: .76rem; color: var(--red); margin-top: .25rem; }
+
+/* ── Send Card ────────────────────────────────────────────── */
+.send-card {
+  text-align: center; padding: 2rem 1.5rem;
+  background: var(--white); border-radius: var(--r);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.send-card .icon { font-size: 3rem; margin-bottom: 1rem; }
+.send-card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: .5rem; }
+.send-card p  { font-size: .88rem; color: var(--muted); }
+
+@media (max-width: 360px) { .row-2, .row-3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚖️ Insolvenz-Fragebogen</h1>
+  <p>Bitte füllen Sie alle Felder so vollständig wie möglich aus.</p>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+  <div class="progress-label" id="prog-label">Schritt 1 von 8</div>
+</div>
+
+<div class="container">
+
+<!-- ═══ SCHRITT 1: Firmendaten ═══ -->
+<div class="step active" id="s1">
+  <div class="step-heading">
+    <h2>🏢 Firmendaten & Anschrift</h2>
+    <p>Bitte geben Sie die offiziellen Unternehmensdaten ein.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Firmenname (wie im Handelsregister) <span class="req">*</span></label>
+      <input class="inp" id="q-firmaName" placeholder="Muster GmbH">
+    </div>
+    <div class="field">
+      <label>Rechtsform <span class="req">*</span></label>
+      <div class="radio-group" id="rg-rechtsform">
+        <label class="rc sel"><input type="radio" name="rechtsform" value="GmbH" checked>GmbH</label>
+        <label class="rc"><input type="radio" name="rechtsform" value="UG (haftungsbeschränkt)">UG</label>
+        <label class="rc"><input type="radio" name="rechtsform" value="AG">AG</label>
+        <label class="rc"><input type="radio" name="rechtsform" value="KG">KG</label>
+        <label class="rc"><input type="radio" name="rechtsform" value="OHG">OHG</label>
+        <label class="rc"><input type="radio" name="rechtsform" value="GbR">GbR</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Straße &amp; Hausnummer <span class="req">*</span></label>
+      <div class="row-2">
+        <input class="inp" id="q-strasse" placeholder="Musterstraße">
+        <input class="inp" id="q-hausnummer" placeholder="12a">
+      </div>
+    </div>
+    <div class="field">
+      <label>PLZ &amp; Ort <span class="req">*</span></label>
+      <div class="row-2">
+        <input class="inp" id="q-plz" placeholder="10115" maxlength="5" inputmode="numeric">
+        <input class="inp" id="q-ort" placeholder="Berlin">
+      </div>
+    </div>
+    <div class="field">
+      <label>Telefon</label>
+      <input class="inp" id="q-telefon" type="tel" placeholder="+49 30 …">
+    </div>
+    <div class="field">
+      <label>E-Mail</label>
+      <input class="inp" id="q-email" type="email" placeholder="info@firma.de">
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 2: Handelsregister & GF ═══ -->
+<div class="step" id="s2">
+  <div class="step-heading">
+    <h2>📋 Handelsregister & Geschäftsführung</h2>
+    <p>Angaben zu Eintragung und vertretungsberechtigten Personen.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Amtsgericht (Handelsregistergericht)</label>
+      <input class="inp" id="q-hrGericht" placeholder="z.B. Amtsgericht Berlin Charlottenburg">
+    </div>
+    <div class="field">
+      <label>Handelsregisternummer</label>
+      <input class="inp" id="q-hrNummer" placeholder="HRB 123456 B">
+    </div>
+    <div class="field">
+      <label>Stammkapital (€)</label>
+      <input class="inp" id="q-stammkapital" type="number" inputmode="decimal" placeholder="25000">
+    </div>
+  </div>
+  <div class="card">
+    <h3>Geschäftsführer / Vertretungsberechtigte</h3>
+    <div class="field">
+      <label>Vollständiger Name <span class="req">*</span></label>
+      <input class="inp" id="q-gfName" placeholder="Max Mustermann">
+    </div>
+    <div class="field">
+      <label>Funktion</label>
+      <input class="inp" id="q-gfFunktion" placeholder="Geschäftsführer / Vorstand …">
+    </div>
+    <div class="field">
+      <label>Privatanschrift (Straße, PLZ, Ort)</label>
+      <input class="inp" id="q-gfAnschrift" placeholder="Nur wenn abweichend von Firmenanschrift">
+    </div>
+  </div>
+  <div class="card">
+    <h3>Gesellschafter</h3>
+    <div id="ges-list-fq"></div>
+    <div class="row-2" style="margin-top:.6rem">
+      <input class="inp" id="fq-ges-name" placeholder="Name des Gesellschafters">
+      <input class="inp" id="fq-ges-anteil" placeholder="Anteil %" inputmode="decimal">
+    </div>
+    <button style="margin-top:.5rem;background:var(--navy);color:white;border:none;border-radius:8px;padding:.6rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;width:100%" onclick="fqAddGes()">＋ Gesellschafter hinzufügen</button>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 3: Insolvenzgrund ═══ -->
+<div class="step" id="s3">
+  <div class="step-heading">
+    <h2>⚠️ Insolvenzgrund & Branche</h2>
+    <p>Bitte geben Sie den zutreffenden Insolvenzgrund an.</p>
+  </div>
+  <div class="card">
+    <h3>Insolvenzgründe (Mehrfachauswahl möglich) <span class="req">*</span></h3>
+    <label class="check-card" id="cc-zahlungsunfaehigkeit">
+      <input type="checkbox" id="q-cb-zahlungsunfaehigkeit">
+      <div>
+        <div class="ctitle">§ 17 InsO – Zahlungsunfähigkeit</div>
+        <div class="cdesc">Fällige Verbindlichkeiten können nicht mehr erfüllt werden</div>
+      </div>
+    </label>
+    <label class="check-card" id="cc-drohend">
+      <input type="checkbox" id="q-cb-drohend">
+      <div>
+        <div class="ctitle">§ 18 InsO – Drohende Zahlungsunfähigkeit</div>
+        <div class="cdesc">Zahlung wird voraussichtlich nicht mehr möglich sein</div>
+      </div>
+    </label>
+    <label class="check-card" id="cc-ueberschuldung">
+      <input type="checkbox" id="q-cb-ueberschuldung">
+      <div>
+        <div class="ctitle">§ 19 InsO – Überschuldung</div>
+        <div class="cdesc">Verbindlichkeiten übersteigen das vorhandene Vermögen</div>
+      </div>
+    </label>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Branche / Wirtschaftszweig <span class="req">*</span></label>
+      <input class="inp" id="q-branche" placeholder="z.B. Gastronomie, IT-Services …">
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 4: Betrieb & Mitarbeiter ═══ -->
+<div class="step" id="s4">
+  <div class="step-heading">
+    <h2>👷 Betrieb & Mitarbeiter</h2>
+    <p>Aktueller Status des Unternehmens und der Beschäftigten.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Betrieb derzeit <span class="req">*</span></label>
+      <div class="radio-group">
+        <label class="rc sel" id="rc4-laufend"><input type="radio" name="betriebStatus" value="laufend" checked>🏭 Laufend</label>
+        <label class="rc" id="rc4-eingestellt"><input type="radio" name="betriebStatus" value="eingestellt">🚫 Eingestellt</label>
+      </div>
+    </div>
+    <div class="field" id="f4-datum" style="display:none">
+      <label>Eingestellt seit</label>
+      <input class="inp" id="q-betriebEingestelltDatum" type="date">
+    </div>
+    <div class="field">
+      <label>Anzahl Mitarbeiter (aktuell)</label>
+      <input class="inp" id="q-maAnzahl" type="number" inputmode="numeric" placeholder="0">
+    </div>
+  </div>
+  <div class="card">
+    <h3>Rückstände</h3>
+    <div class="toggle-row" onclick="fqToggle('tgl4-sv','f4-sv')">
+      <span class="tgl-label">Sozialversicherungsrückstände vorhanden?</span>
+      <div class="tgl" id="tgl4-sv"></div>
+    </div>
+    <div id="f4-sv" style="display:none;padding:.6rem 0">
+      <div class="row-2">
+        <div class="field">
+          <label>Betrag (€)</label>
+          <input class="inp" id="q-svBetrag" type="number" inputmode="decimal" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label>Zeitraum</label>
+          <input class="inp" id="q-svZeitraum" placeholder="z.B. Jan–Jun 2024">
+        </div>
+      </div>
+    </div>
+    <div class="toggle-row" onclick="fqToggle('tgl4-lohn','f4-lohn')">
+      <span class="tgl-label">Lohnrückstände vorhanden?</span>
+      <div class="tgl" id="tgl4-lohn"></div>
+    </div>
+    <div id="f4-lohn" style="display:none;padding:.6rem 0">
+      <div class="row-2">
+        <div class="field">
+          <label>Betrag (€)</label>
+          <input class="inp" id="q-lohnBetrag" type="number" inputmode="decimal" placeholder="0,00">
+        </div>
+        <div class="field">
+          <label>Monate</label>
+          <input class="inp" id="q-lohnZeitraum" placeholder="z.B. Nov–Dez 2024">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 5: Geschäftsräume ═══ -->
+<div class="step" id="s5">
+  <div class="step-heading">
+    <h2>🏠 Geschäftsräume & Mietverhältnis</h2>
+    <p>Informationen zu den genutzten Betriebsstätten.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Nutzungsart <span class="req">*</span></label>
+      <div class="radio-group">
+        <label class="rc" id="rc5-eigen"><input type="radio" name="mietePacht" value="eigentuemer">🏠 Eigentümer</label>
+        <label class="rc sel" id="rc5-miete"><input type="radio" name="mietePacht" value="miete" checked>🔑 Miete</label>
+        <label class="rc" id="rc5-pacht"><input type="radio" name="mietePacht" value="pacht">📋 Pacht</label>
+      </div>
+    </div>
+  </div>
+  <div id="f5-miete" class="card">
+    <h3>Vermieter / Verpächter</h3>
+    <div class="field">
+      <label>Name / Firma des Vermieters</label>
+      <input class="inp" id="q-vermieterName" placeholder="Mustermann Immobilien GmbH">
+    </div>
+    <div class="field">
+      <label>Anschrift des Vermieters</label>
+      <input class="inp" id="q-vermieterAnschrift" placeholder="Straße, PLZ Ort">
+    </div>
+    <div class="field">
+      <label>Monatliche Miete / Pacht (€)</label>
+      <input class="inp" id="q-mieteBetrag" type="number" inputmode="decimal" placeholder="0,00">
+    </div>
+    <div class="field">
+      <label>Kündigungsstand</label>
+      <div class="radio-group">
+        <label class="rc sel" id="rc5-kein"><input type="radio" name="kuendigungStatus" value="nicht_gekuendigt" checked>Nicht gekündigt</label>
+        <label class="rc" id="rc5-gek"><input type="radio" name="kuendigungStatus" value="gekuendigt">Gekündigt</label>
+        <label class="rc" id="rc5-raeum"><input type="radio" name="kuendigungStatus" value="raeumungsklage">Räumungsklage</label>
+      </div>
+    </div>
+    <div class="toggle-row" onclick="fqToggle('tgl5-miete','f5-mieterueck')">
+      <span class="tgl-label">Mietrückstände vorhanden?</span>
+      <div class="tgl" id="tgl5-miete"></div>
+    </div>
+    <div id="f5-mieterueck" style="display:none;padding:.6rem 0">
+      <div class="field">
+        <label>Rückstände Betrag (€)</label>
+        <input class="inp" id="q-mietRueckstaendeBetrag" type="number" inputmode="decimal" placeholder="0,00">
+      </div>
+    </div>
+    <div class="toggle-row" onclick="fqToggleSingle('tgl5-pfand')">
+      <span class="tgl-label">Vermieterpfandrecht geltend gemacht?</span>
+      <div class="tgl" id="tgl5-pfand"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 6: Vermögensübersicht ═══ -->
+<div class="step" id="s6">
+  <div class="step-heading">
+    <h2>💰 Vermögensübersicht</h2>
+    <p>Welche Vermögenswerte sind noch vorhanden? Bitte grobe Schätzung angeben.</p>
+  </div>
+  <div class="card" id="verm-list-fq"></div>
+</div>
+
+<!-- ═══ SCHRITT 7: Gläubiger ═══ -->
+<div class="step" id="s7">
+  <div class="step-heading">
+    <h2>👥 Gläubiger</h2>
+    <p>Bitte alle bekannten Gläubiger eintragen (so vollständig wie möglich).</p>
+  </div>
+  <div class="card">
+    <div id="gl-list-fq"></div>
+    <button onclick="fqAddGl()" style="width:100%;background:var(--navy);color:white;border:none;border-radius:8px;padding:.75rem;font-size:.92rem;font-weight:700;cursor:pointer;margin-top:.5rem">
+      ＋ Gläubiger hinzufügen
+    </button>
+  </div>
+</div>
+
+<!-- ═══ SCHRITT 8: Zusammenfassung ═══ -->
+<div class="step" id="s8">
+  <div class="step-heading">
+    <h2>✅ Zusammenfassung & Absenden</h2>
+    <p>Bitte prüfen Sie Ihre Angaben und senden Sie den Fragebogen ab.</p>
+  </div>
+  <div class="card">
+    <div id="sum-content"></div>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Sonstige Hinweise / Anmerkungen</label>
+      <textarea class="inp" id="q-hinweise" rows="4" placeholder="Weitere wichtige Informationen …" style="resize:vertical"></textarea>
+    </div>
+  </div>
+  <div class="send-card" id="send-card" style="display:none">
+    <div class="icon">✉️</div>
+    <h2>Fragebogen absenden</h2>
+    <p>Klicken Sie auf den Button – es öffnet sich Ihr E-Mail-Programm mit den ausgefüllten Daten.</p>
+    <button class="btn btn-send" style="max-width:300px;margin:1rem auto;display:block" onclick="sendEmail()">
+      📤 Per E-Mail senden
+    </button>
+    <p style="margin-top:.8rem">
+      <a href="#" onclick="fqDownloadJson();return false"
+         style="color:var(--navy);font-size:.85rem">Alternativ: Als JSON-Datei herunterladen</a>
+    </p>
+  </div>
+</div>
+
+</div><!-- /.container -->
+
+<!-- Footer Nav -->
+<div class="footer-nav">
+  <button class="btn btn-back" id="nav-prev" onclick="fqPrev()" style="display:none">← Zurück</button>
+  <button class="btn btn-next" id="nav-next" onclick="fqNext()">Weiter →</button>
+</div>
+
+<script>
+"use strict";
+
+// ── Konfiguration ──────────────────────────────────────────────────────────
+const ANWALT_EMAIL = "kanzlei@beispiel.de"; // ← E-Mail-Adresse der Kanzlei anpassen
+
+const TOTAL_STEPS = 8;
+let curStep = 1;
+
+const VERM_FELDER_FQ = [
+  { key: "kasse",          label: "💵 Kassenbestand / Bankguthaben" },
+  { key: "betriebsmittel", label: "🔧 Betriebsmittel / Maschinen" },
+  { key: "auftraege",      label: "📝 Laufende Aufträge / Vorräte" },
+  { key: "aussenstaende",  label: "📬 Außenstände / Forderungen" },
+  { key: "beteiligungen",  label: "🏦 Beteiligungen" },
+  { key: "grundstuecke",   label: "🏗️ Grundstücke / Immobilien" },
+  { key: "sonstiges",      label: "📦 Sonstiges Vermögen" },
+];
+
+let fqData = {
+  gesellschafter: [],
+  glaeubiger: [],
+  vermoegen: VERM_FELDER_FQ.reduce((o,f) => { o[f.key]={vorhanden:false,betrag:""}; return o;}, {}),
+};
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", () => {
+  buildVermGrid();
+  setupRadioCards();
+  setupCheckCards();
+  setupBetriebRadio();
+  setupMieteRadio();
+  updateNav();
+  renderGlList();
+  renderGesList();
+});
+
+function buildVermGrid() {
+  const el = document.getElementById("verm-list-fq");
+  el.innerHTML = VERM_FELDER_FQ.map(f => `
+    <div class="verm-item" id="vi-${f.key}">
+      <div class="verm-left">
+        <input type="checkbox" id="fq-verm-cb-${f.key}" onchange="fqToggleVerm('${f.key}')">
+        <span class="verm-label">${f.label}</span>
+      </div>
+      <input type="number" class="inp verm-amt" id="fq-verm-amt-${f.key}"
+        placeholder="0,00 €" disabled inputmode="decimal" style="max-width:130px">
+    </div>`).join("");
+}
+
+function setupRadioCards() {
+  document.querySelectorAll(".radio-group .rc input[type=radio]").forEach(inp => {
+    inp.addEventListener("change", () => {
+      inp.closest(".radio-group").querySelectorAll(".rc").forEach(rc => {
+        rc.classList.toggle("sel", rc.querySelector("input")?.checked);
+      });
+    });
+  });
+}
+
+function setupCheckCards() {
+  document.querySelectorAll(".check-card input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      cb.closest(".check-card").classList.toggle("sel", cb.checked);
+    });
+  });
+}
+
+function setupBetriebRadio() {
+  document.querySelectorAll("input[name=betriebStatus]").forEach(r => {
+    r.addEventListener("change", () => {
+      document.getElementById("f4-datum").style.display = r.value === "eingestellt" ? "" : "none";
+    });
+  });
+}
+
+function setupMieteRadio() {
+  document.querySelectorAll("input[name=mietePacht]").forEach(r => {
+    r.addEventListener("change", () => {
+      document.getElementById("f5-miete").style.display = r.value === "eigentuemer" ? "none" : "";
+    });
+  });
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+
+function updateNav() {
+  const pct = ((curStep-1)/(TOTAL_STEPS-1)*100).toFixed(0);
+  document.getElementById("prog-fill").style.width = pct + "%";
+  document.getElementById("prog-label").textContent = `Schritt ${curStep} von ${TOTAL_STEPS}`;
+  document.getElementById("nav-prev").style.display = curStep > 1 ? "" : "none";
+  const next = document.getElementById("nav-next");
+  if (curStep === TOTAL_STEPS) {
+    next.textContent = "Absenden ✉️";
+    next.className = "btn btn-send";
+  } else {
+    next.textContent = "Weiter →";
+    next.className = "btn btn-next";
+  }
+}
+
+function showStep(n) {
+  document.querySelectorAll(".step").forEach((s,i) => s.classList.toggle("active", i+1===n));
+  curStep = n;
+  updateNav();
+  if (n === TOTAL_STEPS) buildSummary();
+  window.scrollTo(0,0);
+}
+
+function fqNext() {
+  if (curStep === TOTAL_STEPS) { finishFq(); return; }
+  if (!fqValidate(curStep)) return;
+  showStep(curStep + 1);
+}
+
+function fqPrev() {
+  if (curStep > 1) showStep(curStep - 1);
+}
+
+// ── Validierung ────────────────────────────────────────────────────────────
+
+function fqValidate(step) {
+  const req = (id, msg) => {
+    const el = document.getElementById(id);
+    const ok = el && el.value.trim();
+    el?.classList.toggle("error", !ok);
+    if (!ok) alert(msg);
+    return !!ok;
+  };
+
+  if (step === 1) return req("q-firmaName","Firmenname ist erforderlich");
+  if (step === 2) return req("q-gfName","Name des Geschäftsführers ist erforderlich");
+  if (step === 3) {
+    const any = ["q-cb-zahlungsunfaehigkeit","q-cb-drohend","q-cb-ueberschuldung"]
+      .some(id => document.getElementById(id).checked);
+    if (!any) { alert("Bitte mindestens einen Insolvenzgrund auswählen"); return false; }
+    return req("q-branche","Branche ist erforderlich");
+  }
+  return true;
+}
+
+// ── Toggle ─────────────────────────────────────────────────────────────────
+
+function fqToggle(tglId, detId) {
+  const tgl = document.getElementById(tglId);
+  const det = document.getElementById(detId);
+  tgl.classList.toggle("on");
+  det.style.display = tgl.classList.contains("on") ? "" : "none";
+}
+
+function fqToggleSingle(id) {
+  document.getElementById(id).classList.toggle("on");
+}
+
+function fqToggleVerm(key) {
+  const cb  = document.getElementById(`fq-verm-cb-${key}`);
+  const amt = document.getElementById(`fq-verm-amt-${key}`);
+  amt.disabled = !cb.checked;
+  if (!cb.checked) amt.value = "";
+  document.getElementById(`vi-${key}`).classList.toggle("active", cb.checked);
+}
+
+// ── Gesellschafter ─────────────────────────────────────────────────────────
+
+function fqAddGes() {
+  const name   = document.getElementById("fq-ges-name").value.trim();
+  const anteil = document.getElementById("fq-ges-anteil").value.trim();
+  if (!name) return;
+  fqData.gesellschafter.push({ name, anteil: anteil || "?" });
+  document.getElementById("fq-ges-name").value = "";
+  document.getElementById("fq-ges-anteil").value = "";
+  renderGesList();
+}
+
+function fqRemoveGes(i) {
+  fqData.gesellschafter.splice(i,1);
+  renderGesList();
+}
+
+function renderGesList() {
+  const el = document.getElementById("ges-list-fq");
+  el.innerHTML = fqData.gesellschafter.map((g,i) => `
+    <div style="display:flex;align-items:center;gap:.6rem;padding:.5rem;background:var(--bg);border-radius:8px;margin-bottom:.3rem">
+      <span style="flex:1;font-weight:600;font-size:.88rem">${esc(g.name)}</span>
+      <span style="color:var(--gold);font-weight:700">${esc(g.anteil)}%</span>
+      <button onclick="fqRemoveGes(${i})" style="background:var(--red);color:white;border:none;border-radius:6px;padding:.2rem .5rem;cursor:pointer">✕</button>
+    </div>`).join("");
+}
+
+// ── Gläubiger ──────────────────────────────────────────────────────────────
+
+let fqGlIdx = null; // for edit
+
+function fqAddGl() {
+  fqData.glaeubiger.push({
+    name:"",grund:"",anschrift:"",plz:"",ort:"",
+    hauptforderung:0,zinsen:0,kosten:0,vertreter:""
+  });
+  renderGlList();
+  // Scroll to new item
+  setTimeout(() => document.getElementById(`gl-${fqData.glaeubiger.length-1}`)?.scrollIntoView({behavior:"smooth"}), 100);
+}
+
+function fqRemoveGl(i) {
+  fqData.glaeubiger.splice(i,1);
+  renderGlList();
+}
+
+function fqGlChange(i, key, val) {
+  fqData.glaeubiger[i][key] = key === "hauptforderung" || key === "zinsen" || key === "kosten"
+    ? parseFloat(val)||0 : val;
+}
+
+function renderGlList() {
+  const el = document.getElementById("gl-list-fq");
+  if (!fqData.glaeubiger.length) {
+    el.innerHTML = '<p style="color:var(--muted);text-align:center;padding:.8rem">Noch keine Gläubiger eingetragen.</p>';
+    return;
+  }
+  el.innerHTML = fqData.glaeubiger.map((g,i) => `
+    <div class="gl-item" id="gl-${i}">
+      <h4>Gläubiger ${i+1} <button class="del-btn" onclick="fqRemoveGl(${i})">✕ Entfernen</button></h4>
+      <div class="field">
+        <label>Name / Firma <span class="req">*</span></label>
+        <input class="inp" value="${esc(g.name)}" placeholder="Finanzamt …" oninput="fqGlChange(${i},'name',this.value)">
+      </div>
+      <div class="field">
+        <label>Forderungsgrund</label>
+        <input class="inp" value="${esc(g.grund)}" placeholder="Umsatzsteuer, Miete …" oninput="fqGlChange(${i},'grund',this.value)">
+      </div>
+      <div class="field">
+        <label>Anschrift</label>
+        <input class="inp" value="${esc(g.anschrift)}" placeholder="Straße, Nr." oninput="fqGlChange(${i},'anschrift',this.value)">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>PLZ</label>
+          <input class="inp" value="${esc(g.plz)}" placeholder="10115" inputmode="numeric" oninput="fqGlChange(${i},'plz',this.value)">
+        </div>
+        <div class="field">
+          <label>Ort</label>
+          <input class="inp" value="${esc(g.ort)}" placeholder="Berlin" oninput="fqGlChange(${i},'ort',this.value)">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Hauptforderung (€)</label>
+          <input class="inp" type="number" value="${g.hauptforderung||''}" placeholder="0,00" inputmode="decimal" oninput="fqGlChange(${i},'hauptforderung',this.value)">
+        </div>
+        <div class="field">
+          <label>Zinsen (€)</label>
+          <input class="inp" type="number" value="${g.zinsen||''}" placeholder="0,00" inputmode="decimal" oninput="fqGlChange(${i},'zinsen',this.value)">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Kosten (€)</label>
+          <input class="inp" type="number" value="${g.kosten||''}" placeholder="0,00" inputmode="decimal" oninput="fqGlChange(${i},'kosten',this.value)">
+        </div>
+        <div class="field">
+          <label>Vertreter / Anwalt</label>
+          <input class="inp" value="${esc(g.vertreter)}" placeholder="RA …" oninput="fqGlChange(${i},'vertreter',this.value)">
+        </div>
+      </div>
+    </div>`).join("");
+}
+
+// ── Zusammenfassung ────────────────────────────────────────────────────────
+
+function buildSummary() {
+  collectData();
+  const d = fqData;
+  const rows = [
+    ["Firma",         d.firmaName || "–"],
+    ["Rechtsform",    d.rechtsform || "–"],
+    ["Adresse",       [d.strasse, d.hausnummer, d.plz, d.ort].filter(Boolean).join(" ") || "–"],
+    ["Handelsregister", d.hrNummer || "–"],
+    ["Geschäftsführer", d.gfName || "–"],
+    ["Insolvenzgründe", (d.insolvenzgruende||[]).map(k =>
+        ({zahlungsunfaehigkeit:"§17 Zahlungsunfähigkeit",drohend:"§18 Drohend",ueberschuldung:"§19 Überschuldung"}[k]||k)
+      ).join(", ") || "–"],
+    ["Branche",       d.branche || "–"],
+    ["Mitarbeiter",   d.maAnzahl || "0"],
+    ["Gläubiger",     d.glaeubiger.length + " eingetragen"],
+    ["Gesamtforderungen", fmtEur(d.glaeubiger.reduce((s,g)=>s+(g.hauptforderung||0)+(g.zinsen||0)+(g.kosten||0),0))],
+  ];
+
+  document.getElementById("sum-content").innerHTML =
+    rows.map(([k,v]) => `<div class="sum-row"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>`).join("");
+
+  document.getElementById("send-card").style.display = "";
+}
+
+// ── Daten sammeln ──────────────────────────────────────────────────────────
+
+function collectData() {
+  const g = id => document.getElementById(id)?.value?.trim() || "";
+  const b = id => document.getElementById(id)?.checked || false;
+
+  Object.assign(fqData, {
+    firmaName:   g("q-firmaName"),
+    rechtsform:  document.querySelector('input[name=rechtsform]:checked')?.value || "GmbH",
+    strasse:     g("q-strasse"),
+    hausnummer:  g("q-hausnummer"),
+    plz:         g("q-plz"),
+    ort:         g("q-ort"),
+    telefon:     g("q-telefon"),
+    email:       g("q-email"),
+    hrGericht:   g("q-hrGericht"),
+    hrNummer:    g("q-hrNummer"),
+    stammkapital:g("q-stammkapital"),
+    gfName:      g("q-gfName"),
+    gfFunktion:  g("q-gfFunktion"),
+    gfAnschrift: g("q-gfAnschrift"),
+    insolvenzgruende: ["zahlungsunfaehigkeit","drohend","ueberschuldung"].filter(k => b("q-cb-"+k)),
+    branche:     g("q-branche"),
+    betriebStatus: document.querySelector('input[name=betriebStatus]:checked')?.value || "laufend",
+    betriebEingestelltDatum: g("q-betriebEingestelltDatum"),
+    maAnzahl:    g("q-maAnzahl"),
+    svRueckstaende:  document.getElementById("tgl4-sv")?.classList.contains("on"),
+    svBetrag:    g("q-svBetrag"),
+    svZeitraum:  g("q-svZeitraum"),
+    lohnRueckstaende: document.getElementById("tgl4-lohn")?.classList.contains("on"),
+    lohnBetrag:  g("q-lohnBetrag"),
+    lohnZeitraum:g("q-lohnZeitraum"),
+    mietePacht:  document.querySelector('input[name=mietePacht]:checked')?.value || "miete",
+    vermieterName:   g("q-vermieterName"),
+    vermieterAnschrift: g("q-vermieterAnschrift"),
+    mieteBetrag: g("q-mieteBetrag"),
+    kuendigungStatus: document.querySelector('input[name=kuendigungStatus]:checked')?.value || "nicht_gekuendigt",
+    mietRueckstaendeBetrag: g("q-mietRueckstaendeBetrag"),
+    vermieterpfandrecht: document.getElementById("tgl5-pfand")?.classList.contains("on"),
+    hinweise:    g("q-hinweise"),
+  });
+
+  // Vermögen
+  VERM_FELDER_FQ.forEach(f => {
+    const cb  = document.getElementById(`fq-verm-cb-${f.key}`);
+    const amt = document.getElementById(`fq-verm-amt-${f.key}`);
+    if (cb) fqData.vermoegen[f.key] = { vorhanden: cb.checked, betrag: amt?.value || "" };
+  });
+}
+
+// ── Absenden ───────────────────────────────────────────────────────────────
+
+function finishFq() {
+  buildSummary();
+}
+
+function sendEmail() {
+  collectData();
+  const json     = JSON.stringify(fqData);
+  const b64      = btoa(unescape(encodeURIComponent(json)));
+  const block    = `===INSOLVENZ-START===\n${b64}\n===INSOLVENZ-ENDE===`;
+  const firma    = fqData.firmaName || "Mandant";
+  const subject  = encodeURIComponent(`Insolvenz-Fragebogen: ${firma}`);
+  const body     = encodeURIComponent(
+    `Sehr geehrte Damen und Herren,\n\nerbeten finden Sie meinen ausgefüllten Insolvenz-Fragebogen.\n\n` +
+    `Bitte importieren Sie den folgenden Block in den Insolvenz-Manager:\n\n${block}\n\n` +
+    `Mit freundlichen Grüßen\n${firma}`
+  );
+  window.location.href = `mailto:${ANWALT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+function fqDownloadJson() {
+  collectData();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(fqData, null, 2)], {type:"application/json"}));
+  a.download = `fragebogen_${fqData.firmaName||"mandant"}.json`;
+  a.click();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function fmtEur(n) {
+  return Number(n||0).toLocaleString("de-DE",{style:"currency",currency:"EUR"});
+}
+</script>
+</body>
+</html>
