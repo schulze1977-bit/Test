@@ -121,23 +121,22 @@ def fill_pdf(template_path: str, data: dict, output_path: str) -> int:
     reader = PdfReader(template_path)
     writer = PdfWriter()
 
-    # Alle Seiten kopieren
-    for page in reader.pages:
-        writer.add_page(page)
-
-    # Bestehende Felder aus Template übernehmen
-    if reader.get_fields():
-        writer.clone_reader_document_root(reader)
+    # append() kopiert Seiten + Formularstruktur korrekt (clone_reader_document_root
+    # schlägt bei komplexen PDFs mit IndexError fehl)
+    writer.append(reader)
 
     mapping = map_fields(data)
     filled  = 0
 
-    for page_num, page in enumerate(writer.pages):
+    for page in writer.pages:
         annotations = page.get("/Annots")
         if not annotations:
             continue
         for annot_ref in annotations:
-            annot = annot_ref.get_object() if hasattr(annot_ref, "get_object") else annot_ref
+            try:
+                annot = annot_ref.get_object() if hasattr(annot_ref, "get_object") else annot_ref
+            except Exception:
+                continue
             if annot.get("/Subtype") != "/Widget":
                 continue
             field_name = annot.get("/T")
