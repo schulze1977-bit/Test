@@ -1,0 +1,96 @@
+{
+  "firmaName": "Berliner Handels GmbH",
+  "rechtsform": "GmbH",
+  "strasse": "Kurfürstendamm",
+  "hausnummer": "42",
+  "plz": "10719",
+  "ort": "Berlin",
+  "telefon": "0172 1234567",
+  "telefonFest": "030 9876543",
+  "fax": "",
+  "email": "mueller@berliner-handels.de",
+  "aktenzeichen": "",
+  "hrGericht": "Charlottenburg",
+  "hrNummer": "HRB 12345 B",
+  "stammkapital": "25.000,00",
+  "gfName": "Thomas Müller",
+  "gfFunktion": "Geschäftsführer",
+  "gfAnschrift": "Hauptstraße 7, 10827 Berlin",
+  "gfTelefon": "0172 1234567",
+  "gesellschafterInfo": "Thomas Müller (100%)",
+  "insolvenzgruende": [
+    "zahlungsunfaehigkeit",
+    "ueberschuldung"
+  ],
+  "branche": "Einzelhandel / Textilwaren",
+  "anwalt": "",
+  "steuerberater": "Steuerberatung Weiss & Partner, Uhlandstr. 22, Berlin",
+  "hinweise": "",
+  "betriebStatus": "eingestellt",
+  "betriebEingestelltDatum": "10.01.2025",
+  "maAnzahl": "12",
+  "azubiAnzahl": "0",
+  "svRueckstaende": true,
+  "svBetrag": "8.640,00",
+  "svTraeger": "AOK Berlin",
+  "lohnRueckstaende": true,
+  "lohnBetrag": "24.000,00",
+  "lohnRueckstandNamen": "Alle 12 Mitarbeiter Nov./Dez. 2024",
+  "kuendigungDatum": "",
+  "kuendigungNamen": "",
+  "mutterschutzInfo": "",
+  "mietePacht": "miete",
+  "vermieterName": "Grundstücksverwaltung Schröder GmbH & Co. KG",
+  "mieteBetrag": "4.500,00",
+  "mietVertragDatum": "01.01.2020",
+  "mietRueckstaendeBetrag": "18.000,00",
+  "vermieterpfandrecht": false,
+  "umsatzAktuell": "380.000,00",
+  "gewinnAktuell": "-45.000,00",
+  "umsatzVorjahr": "520.000,00",
+  "gewinnVorjahr": "18.000,00",
+  "auftraegeDetail": "",
+  "fahrzeuge": [
+    {
+      "marke": "VW Transporter",
+      "baujahr": "2021",
+      "kennzeichen": "B-BH 1234",
+      "wert": "18.500,00",
+      "belastung": "12.000,00 (Deutsche Bank)"
+    }
+  ],
+  "glaeubiger": [],
+  "vermoegen": {
+    "kasse": {
+      "vorhanden": true,
+      "betrag": "2340.5"
+    },
+    "betriebsmittel": {
+      "vorhanden": true,
+      "betrag": "37000.0"
+    },
+    "auftraege": {
+      "vorhanden": true,
+      "betrag": "28000.0"
+    },
+    "aussenstaende": {
+      "vorhanden": true,
+      "betrag": "8750.0"
+    },
+    "beteiligungen": {
+      "vorhanden": false,
+      "betrag": ""
+    },
+    "grundstuecke": {
+      "vorhanden": false,
+      "betrag": ""
+    },
+    "sonstiges": {
+      "vorhanden": false,
+      "betrag": ""
+    }
+  },
+  "_status": "neu",
+  "notizen": "Gläubigerangaben aus Fragebogen:\nFinanzamt Berlin-Charlottenburg, 24.750 EUR (USt + KSt)\nAOK Berlin, 8.640 EUR (SV-Beiträge)\nDeutsche Bank AG, 85.000 EUR (Betriebsmittelkredit)\nBerliner Verlagshaus KG 12.400 EUR; Schröder GmbH & Co. KG 18.000 EUR; Mode Import GmbH 31.500 EUR; StB Weiss 4.200 EUR",
+  "geschaeftsraumAdr": "Kurfürstendamm 42, 10719 Berlin"
+}
