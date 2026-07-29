@@ -2023,7 +2023,9 @@ function applyImport(jsonStr) {
 function applyImportData(imported) {
   caseData = { ...newCaseData(), ...imported };
   closeModal();
-  newCase();
+  state.caseId = null;
+  state.currentStep = 1;
+  showWizard();
   formToUI();
   const gl = (caseData.glaeubiger || []).length;
   toast(`Fragebogen importiert · ${gl} Gläubiger ✓`, "success");
