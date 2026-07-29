@@ -806,6 +806,7 @@ body {
             📊 Excel importieren
             <input type="file" id="excel-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event)">
           </label>
+          <button class="btn btn-outline btn-sm" onclick="downloadExcelVorlage()">⬇ Vorlage</button>
         </div>
 
         <div id="glaeu-form-container" class="hidden">
@@ -1769,56 +1770,127 @@ function importExcel(event) {
       const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
       if (!rows.length) { toast("Keine Zeilen gefunden", "error"); return; }
 
-      const MAP = {
-        name: ["name","firma","gläubiger","kreditor","Name","Gläubiger"],
-        anschrift: ["straße","strasse","anschrift","adresse","Straße","Anschrift"],
-        plz: ["plz","PLZ","postleitzahl"],
-        ort: ["ort","Ort","stadt","Stadt"],
-        grund: ["grund","forderungsgrund","beschreibung","Forderungsgrund"],
-        hauptforderung: ["hauptforderung","forderung","betrag","Hauptforderung","Forderung","Betrag"],
-        zinsen: ["zinsen","Zinsen","zins","zinsen_hoehe","Zinsen Höhe"],
-        kosten: ["kosten","Kosten"],
-        vertreter: ["vertreter","anwalt","Vertreter"],
-        zinsenBis: ["zinsen_bis","zinsenBis","Zinsen bis","berechnet_bis"],
-        nahestehendeP138: ["nahestehend","nahestehendeP138","§138","nahe_stehend"],
-        forderungTituliert: ["tituliert","forderungTituliert","Tituliert"],
-        forderungGesichert: ["gesichert","forderungGesichert","Gesichert"],
-        kategorie: ["kategorie","Kategorie","1b_kategorie"],
+      // Spaltenköpfe aus erster Zeile (case-insensitiv, Teilstring-Suche)
+      const colKeys = Object.keys(rows[0]);
+      const colLower = colKeys.map(k => k.toLowerCase());
+
+      // Substring-Matching auf die Spaltenüberschriften
+      const ALIASES = {
+        name:              ["gläubiger", "glaeubiger", "name/kurz", "name", "firma", "kreditor"],
+        anschrift:         ["anschrift", "adresse", "straße", "strasse"],
+        plz:               ["postleitzahl", "plz"],
+        ort:               ["ort", "stadt"],
+        grund:             ["forderungsgrund", "grund", "beschreibung"],
+        hauptforderung:    ["hauptforderung in eur", "hauptforderung", "forderungsbetrag"],
+        zinsen:            ["zinsen (höhe", "zinsen (hohe", "zinsen höhe", "zinsen in eur", "zinsen"],
+        zinsenBis:         ["zinsen berechnet bis", "berechnet bis", "zinsen bis"],
+        kosten:            ["kosten in eur", "kosten"],
+        vertreter:         ["gläubigervertreter", "glaubigervertreter", "vertreter", "anwalt"],
+        nahestehendeP138:  ["nahe stehende", "§ 138", "nahestehend"],
+        forderungTituliert:["forderung tituliert", "tituliert"],
+        forderungGesichert:["sonderrechte gesichert", "forderung durch sonder", "gesichert"],
+        kategorie:         ["kategorie"],
       };
 
-      const mapKey = (row, aliases) => {
-        for (const a of aliases) { if (row[a] !== undefined) return String(row[a]); }
-        return "";
+      const colMap = {};
+      for (const [field, aliases] of Object.entries(ALIASES)) {
+        for (const alias of aliases) {
+          const idx = colLower.findIndex(k => k.includes(alias));
+          if (idx >= 0) { colMap[field] = colKeys[idx]; break; }
+        }
+      }
+
+      const getVal = (row, field) => {
+        const col = colMap[field];
+        return col !== undefined ? String(row[col] || "") : "";
+      };
+
+      // Deutsche Zahl parsen: "1.911,84 EUR (Text)" → 1911.84
+      const parseEur = (s) => {
+        if (!s) return 0;
+        const str = String(s);
+        // deutsches Format: Punkte als Tausender, Komma als Dezimal
+        const m = str.match(/([\d]{1,3}(?:\.\d{3})*,\d+)/);
+        if (m) return parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+        // englisches/gemischtes Format als Fallback
+        const m2 = str.match(/(\d+\.?\d*)/);
+        return m2 ? parseFloat(m2[1]) : 0;
+      };
+
+      // Yes/No/ja/nein normalisieren
+      const toJaNein = (s) => {
+        const v = String(s).toLowerCase().trim();
+        return (v === "yes" || v === "ja" || v === "1" || v === "true" || v === "x") ? "ja" : "nein";
       };
 
       let imported = 0;
       rows.forEach(row => {
-        const name = mapKey(row, MAP.name);
-        if (!name) return;
+        const name = getVal(row, "name");
+        if (!name || name === "#") return;
+        const rawHaupt = getVal(row, "hauptforderung");
+        const betrag = parseEur(rawHaupt);
+        if (!name && !betrag) return;
         caseData.glaeubiger.push({
-          name, anschrift: mapKey(row, MAP.anschrift),
-          plz: mapKey(row, MAP.plz), ort: mapKey(row, MAP.ort),
-          grund: mapKey(row, MAP.grund),
-          hauptforderung: parseFloat(mapKey(row, MAP.hauptforderung)) || 0,
-          zinsen: parseFloat(mapKey(row, MAP.zinsen)) || 0,
-          kosten: parseFloat(mapKey(row, MAP.kosten)) || 0,
-          vertreter: mapKey(row, MAP.vertreter),
-          zinsenBis: mapKey(row, MAP.zinsenBis),
-          nahestehendeP138: mapKey(row, MAP.nahestehendeP138),
-          forderungTituliert: mapKey(row, MAP.forderungTituliert),
-          forderungGesichert: mapKey(row, MAP.forderungGesichert),
-          kategorie: mapKey(row, MAP.kategorie),
+          name,
+          anschrift: getVal(row, "anschrift"),
+          plz:       getVal(row, "plz"),
+          ort:       getVal(row, "ort"),
+          grund:     getVal(row, "grund"),
+          hauptforderung:     betrag,
+          zinsen:             parseEur(getVal(row, "zinsen")),
+          zinsenBis:          getVal(row, "zinsenBis"),
+          kosten:             parseEur(getVal(row, "kosten")),
+          vertreter:          getVal(row, "vertreter"),
+          nahestehendeP138:   toJaNein(getVal(row, "nahestehendeP138")),
+          forderungTituliert: toJaNein(getVal(row, "forderungTituliert")),
+          forderungGesichert: toJaNein(getVal(row, "forderungGesichert")),
+          kategorie:          getVal(row, "kategorie"),
         });
         imported++;
       });
       renderGlaeubiger();
+      event.target.value = "";
       toast(`${imported} Gläubiger importiert ✓`, "success");
     } catch(err) {
+      event.target.value = "";
       toast("Fehler beim Excel-Import: " + err.message, "error");
     }
   };
   reader.readAsArrayBuffer(file);
-  event.target.value = "";
+}
+
+function downloadExcelVorlage() {
+  if (typeof XLSX === "undefined") { toast("XLSX-Bibliothek nicht geladen", "error"); return; }
+  const headers = [
+    "Gläubiger (Name/Kurzbezeichnung und Anschrift)",
+    "Gläubigervertreter",
+    "Nahe stehende Person (§ 138 InsO)",
+    "Forderungsgrund",
+    "Hauptforderung in EUR",
+    "Zinsen (Höhe in EUR)",
+    "Zinsen berechnet bis zum",
+    "Kosten in EUR",
+    "Forderung tituliert (ja/nein)",
+    "Forderung durch Sonderrechte gesichert (ja/nein)",
+  ];
+  const beispiel = [
+    "Muster GmbH, Musterstraße 1, 10115 Berlin",
+    "kein Vertreter",
+    "nein",
+    "Warenlieferung Rechnung 2025-001",
+    "5000,00",
+    "150,00",
+    "31.12.2025",
+    "50,00",
+    "ja",
+    "nein",
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, beispiel]);
+  // Spaltenbreiten
+  ws["!cols"] = headers.map((h, i) => ({ wch: i === 0 ? 50 : i === 3 ? 40 : 20 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Gläubigerliste");
+  XLSX.writeFile(wb, "Glaeubigerliste_Vorlage.xlsx");
 }
 
 // ══════════════════════════════════════════════════════════════════
