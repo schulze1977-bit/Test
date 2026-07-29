@@ -738,7 +738,8 @@ let fqGlIdx = null; // for edit
 function fqAddGl() {
   fqData.glaeubiger.push({
     name:"",grund:"",anschrift:"",plz:"",ort:"",
-    hauptforderung:0,zinsen:0,kosten:0,vertreter:""
+    hauptforderung:0,zinsen:0,kosten:0,vertreter:"",
+    zinsenBis:"",nahestehendeP138:"",forderungTituliert:"",forderungGesichert:"",kategorie:""
   });
   renderGlList();
   // Scroll to new item
@@ -751,7 +752,7 @@ function fqRemoveGl(i) {
 }
 
 function fqGlChange(i, key, val) {
-  fqData.glaeubiger[i][key] = key === "hauptforderung" || key === "zinsen" || key === "kosten"
+  fqData.glaeubiger[i][key] = (key === "hauptforderung" || key === "zinsen" || key === "kosten")
     ? parseFloat(val)||0 : val;
 }
 
@@ -802,9 +803,53 @@ function renderGlList() {
           <input class="inp" type="number" value="${g.kosten||''}" placeholder="0,00" inputmode="decimal" oninput="fqGlChange(${i},'kosten',this.value)">
         </div>
         <div class="field">
+          <label>Zinsen berechnet bis zum</label>
+          <input class="inp" type="date" value="${esc(g.zinsenBis||'')}" oninput="fqGlChange(${i},'zinsenBis',this.value)">
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Nahestehende Person §138</label>
+          <select class="inp" onchange="fqGlChange(${i},'nahestehendeP138',this.value)">
+            <option value="" ${!g.nahestehendeP138?'selected':''}>–</option>
+            <option value="ja" ${g.nahestehendeP138==='ja'?'selected':''}>Ja</option>
+            <option value="nein" ${g.nahestehendeP138==='nein'?'selected':''}>Nein</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Forderung tituliert</label>
+          <select class="inp" onchange="fqGlChange(${i},'forderungTituliert',this.value)">
+            <option value="" ${!g.forderungTituliert?'selected':''}>–</option>
+            <option value="ja" ${g.forderungTituliert==='ja'?'selected':''}>Ja</option>
+            <option value="nein" ${g.forderungTituliert==='nein'?'selected':''}>Nein</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Durch Sonderrechte gesichert</label>
+          <select class="inp" onchange="fqGlChange(${i},'forderungGesichert',this.value)">
+            <option value="" ${!g.forderungGesichert?'selected':''}>–</option>
+            <option value="ja" ${g.forderungGesichert==='ja'?'selected':''}>Ja</option>
+            <option value="nein" ${g.forderungGesichert==='nein'?'selected':''}>Nein</option>
+          </select>
+        </div>
+        <div class="field">
           <label>Vertreter / Anwalt</label>
           <input class="inp" value="${esc(g.vertreter)}" placeholder="RA …" oninput="fqGlChange(${i},'vertreter',this.value)">
         </div>
+      </div>
+      <div class="field">
+        <label>Kategorie (Anlage 1B)</label>
+        <select class="inp" onchange="fqGlChange(${i},'kategorie',this.value)">
+          <option value="" ${!g.kategorie?'selected':''}>– nicht kategorisiert –</option>
+          <option value="absonderung" ${g.kategorie==='absonderung'?'selected':''}>Absonderungsberechtigte (§49 ff. InsO)</option>
+          <option value="masse" ${g.kategorie==='masse'?'selected':''}>Massegläubiger (§53 InsO)</option>
+          <option value="nichtNachrangig" ${g.kategorie==='nichtNachrangig'?'selected':''}>Nicht nachrangige Insolvenzgläubiger (§38 InsO)</option>
+          <option value="nachrangig" ${g.kategorie==='nachrangig'?'selected':''}>Nachrangige Insolvenzgläubiger (§39 InsO)</option>
+          <option value="aussonderung" ${g.kategorie==='aussonderung'?'selected':''}>Aussonderungsberechtigte (§47 InsO)</option>
+          <option value="sonstige" ${g.kategorie==='sonstige'?'selected':''}>Sonstige Gläubiger</option>
+        </select>
       </div>
     </div>`).join("");
 }

@@ -841,13 +841,57 @@ body {
                 <input class="form-control" id="gf-hauptforderung" type="number" placeholder="0.00">
               </div>
               <div class="form-group">
-                <label>Zinsen (€)</label>
+                <label>Zinsen Höhe (€)</label>
                 <input class="form-control" id="gf-zinsen" type="number" placeholder="0.00">
               </div>
               <div class="form-group">
                 <label>Kosten (€)</label>
                 <input class="form-control" id="gf-kosten" type="number" placeholder="0.00">
               </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Zinsen berechnet bis zum</label>
+                <input class="form-control" id="gf-zinsenBis" type="date">
+              </div>
+              <div class="form-group">
+                <label>Nahestehende Person §138</label>
+                <select class="form-control" id="gf-nahestehendeP138">
+                  <option value="">–</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Forderung tituliert</label>
+                <select class="form-control" id="gf-forderungTituliert">
+                  <option value="">–</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Durch Sonderrechte gesichert</label>
+                <select class="form-control" id="gf-forderungGesichert">
+                  <option value="">–</option>
+                  <option value="ja">Ja</option>
+                  <option value="nein">Nein</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Kategorie (Anlage 1B)</label>
+              <select class="form-control" id="gf-kategorie">
+                <option value="">– nicht kategorisiert –</option>
+                <option value="absonderung">Absonderungsberechtigte (§49 ff. InsO)</option>
+                <option value="masse">Massegläubiger (§53 InsO)</option>
+                <option value="nichtNachrangig">Nicht nachrangige Insolvenzgläubiger (§38 InsO)</option>
+                <option value="nachrangig">Nachrangige Insolvenzgläubiger (§39 InsO)</option>
+                <option value="aussonderung">Aussonderungsberechtigte (§47 InsO)</option>
+                <option value="sonstige">Sonstige Gläubiger</option>
+              </select>
             </div>
             <div class="form-group">
               <label>Vertreter / Anwalt des Gläubigers</label>
@@ -931,6 +975,12 @@ body {
             <h4>Adobe-Import</h4>
             <p>Ausgefülltes Adobe-PDF in Daten umwandeln</p>
             <button class="btn btn-outline w-full" onclick="showAdobeHint()">Anleitung anzeigen</button>
+          </div>
+          <div class="output-card gold">
+            <div class="icon">📑</div>
+            <h4>Anlage 1A &amp; 1B</h4>
+            <p>Gläubigerverzeichnisse als Word-Dokument erstellen</p>
+            <button class="btn btn-gold w-full" onclick="showAnlageHint()">Anleitung anzeigen</button>
           </div>
         </div>
       </div>
@@ -1602,7 +1652,8 @@ function showGlaeubigerForm(idx = null) {
 
   if (idx !== null) {
     const g = caseData.glaeubiger[idx];
-    ["name","grund","anschrift","plz","ort","hauptforderung","zinsen","kosten","vertreter"].forEach(k => {
+    ["name","grund","anschrift","plz","ort","hauptforderung","zinsen","kosten","vertreter",
+     "zinsenBis","nahestehendeP138","forderungTituliert","forderungGesichert","kategorie"].forEach(k => {
       const el = document.getElementById("gf-"+k);
       if (el) el.value = g[k] || "";
     });
@@ -1627,6 +1678,11 @@ function saveGlaeubigerForm() {
     zinsen: parseFloat(g("zinsen")) || 0,
     kosten: parseFloat(g("kosten")) || 0,
     vertreter: g("vertreter"),
+    zinsenBis: g("zinsenBis"),
+    nahestehendeP138: g("nahestehendeP138"),
+    forderungTituliert: g("forderungTituliert"),
+    forderungGesichert: g("forderungGesichert"),
+    kategorie: g("kategorie"),
   };
   if (state.editingGlaeubigerIdx !== null) {
     caseData.glaeubiger[state.editingGlaeubigerIdx] = obj;
@@ -1656,8 +1712,11 @@ function renderGlaeubiger() {
         <div class="name">${esc(g.name)}</div>
         <div class="details">${esc(g.anschrift||'')} ${esc(g.plz||'')} ${esc(g.ort||'')} · ${esc(g.grund||'')}</div>
         <div class="details" style="margin-top:.2rem">
-          HF: ${fmtEur(g.hauptforderung)} · Zinsen: ${fmtEur(g.zinsen)} · Kosten: ${fmtEur(g.kosten)}
+          HF: ${fmtEur(g.hauptforderung)} · Zinsen: ${fmtEur(g.zinsen)}${g.zinsenBis ? ' bis '+g.zinsenBis : ''} · Kosten: ${fmtEur(g.kosten)}
           <strong> = ${fmtEur((g.hauptforderung||0)+(g.zinsen||0)+(g.kosten||0))}</strong>
+        </div>
+        <div class="details" style="margin-top:.2rem;font-size:.78rem;color:var(--muted)">
+          ${g.nahestehendeP138==='ja'?'⚠ Nahestehend §138 · ':''}${g.forderungTituliert==='ja'?'Tituliert · ':''}${g.forderungGesichert==='ja'?'Gesichert · ':''}${g.kategorie ? '📂 '+({absonderung:'Absonderung',masse:'Masse',nichtNachrangig:'Nicht nachrangig',nachrangig:'Nachrangig',aussonderung:'Aussonderung',sonstige:'Sonstige'}[g.kategorie]||g.kategorie) : ''}
         </div>
       </div>
       <div class="glaeu-actions">
@@ -1696,9 +1755,14 @@ function importExcel(event) {
         ort: ["ort","Ort","stadt","Stadt"],
         grund: ["grund","forderungsgrund","beschreibung","Forderungsgrund"],
         hauptforderung: ["hauptforderung","forderung","betrag","Hauptforderung","Forderung","Betrag"],
-        zinsen: ["zinsen","Zinsen","zins"],
+        zinsen: ["zinsen","Zinsen","zins","zinsen_hoehe","Zinsen Höhe"],
         kosten: ["kosten","Kosten"],
         vertreter: ["vertreter","anwalt","Vertreter"],
+        zinsenBis: ["zinsen_bis","zinsenBis","Zinsen bis","berechnet_bis"],
+        nahestehendeP138: ["nahestehend","nahestehendeP138","§138","nahe_stehend"],
+        forderungTituliert: ["tituliert","forderungTituliert","Tituliert"],
+        forderungGesichert: ["gesichert","forderungGesichert","Gesichert"],
+        kategorie: ["kategorie","Kategorie","1b_kategorie"],
       };
 
       const mapKey = (row, aliases) => {
@@ -1718,6 +1782,11 @@ function importExcel(event) {
           zinsen: parseFloat(mapKey(row, MAP.zinsen)) || 0,
           kosten: parseFloat(mapKey(row, MAP.kosten)) || 0,
           vertreter: mapKey(row, MAP.vertreter),
+          zinsenBis: mapKey(row, MAP.zinsenBis),
+          nahestehendeP138: mapKey(row, MAP.nahestehendeP138),
+          forderungTituliert: mapKey(row, MAP.forderungTituliert),
+          forderungGesichert: mapKey(row, MAP.forderungGesichert),
+          kategorie: mapKey(row, MAP.kategorie),
         });
         imported++;
       });
@@ -1792,6 +1861,17 @@ function showAdobeHint() { showHint("Adobe-PDF importieren (import_adobe_pdf.py)
   <div class="code-block">python import_adobe_pdf.py ausgefuelltes_adobe_formular.pdf data.json</div>
   <p style="margin-top:.5rem;font-size:.82rem;color:var(--muted)">Funktioniert auch mit XFDF-Dateien:</p>
   <div class="code-block">python import_adobe_pdf.py formular.xfdf data.json</div>`);
+}
+
+function showAnlageHint() { showHint("Anlage 1A & 1B erstellen (fill_antrag_jp.py)", `
+  <p style="margin-bottom:.8rem">Erstellt das vereinfachte (1A) und qualifizierte (1B) Gläubigerverzeichnis als Word-Dokument sowie das befüllte AG-Charlottenburg-PDF:</p>
+  <div class="code-block">python fill_antrag_jp.py data.json Anlage_1A.docx Anlage_1B.docx</div>
+  <p style="margin-top:.5rem;font-size:.82rem;color:var(--muted)">Mit optionalem PDF-Antrag:</p>
+  <div class="code-block">python fill_antrag_jp.py data.json Anlage_1A.docx Anlage_1B.docx antrag_original.pdf antrag_ausgefuellt.pdf</div>
+  <p style="margin-top:.8rem;font-size:.82rem;color:var(--muted)">
+    Voraussetzung: <code>pip install python-docx pypdf</code><br>
+    Tipp: Weisen Sie jedem Gläubiger oben eine Kategorie zu, damit die Anlage 1B automatisch in Abschnitte (Absonderung, Masse, §38 InsO …) unterteilt wird.
+  </p>`);
 }
 
 function showHint(title, html) {
