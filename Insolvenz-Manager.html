@@ -958,11 +958,11 @@ body {
             <p>Alle Falldaten als JSON für die Python-Skripte</p>
             <button class="btn btn-gold w-full" onclick="downloadJson()">⬇ Herunterladen</button>
           </div>
-          <div class="output-card">
+          <div class="output-card green">
             <div class="icon">📋</div>
-            <h4>PDF-Formular befüllen</h4>
-            <p>AG Charlottenburg Formular automatisch ausfüllen</p>
-            <button class="btn btn-outline w-full" onclick="showPdfHint()">Anleitung anzeigen</button>
+            <h4>Amtlicher Insolvenzantrag</h4>
+            <p>AG Charlottenburg – ausgefülltes PDF herunterladen</p>
+            <button class="btn btn-gold w-full" onclick="downloadAntragPdf()" id="btn-antrag-pdf">⬇ Antrag herunterladen</button>
           </div>
           <div class="output-card green">
             <div class="icon">✉️</div>
@@ -1858,6 +1858,38 @@ function buildSummary() {
 function downloadJson() {
   uiToForm();
   downloadBlob(JSON.stringify(caseData, null, 2), "data.json", "application/json");
+}
+
+async function downloadAntragPdf() {
+  if (!state.caseId) {
+    toast("Bitte zuerst den Fall speichern (💾)", "error");
+    return;
+  }
+  if (!state.serverOnline) {
+    toast("Server nicht erreichbar – bitte insolvenz_server.py starten", "error");
+    return;
+  }
+  const btn = document.getElementById("btn-antrag-pdf");
+  const orig = btn.textContent;
+  btn.textContent = "⏳ Wird erstellt…";
+  btn.disabled = true;
+  try {
+    await saveCase(false);
+    const resp = await fetch(`/api/cases/${state.caseId}/antrag-pdf`);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.fehler || `HTTP ${resp.status}`);
+    }
+    const blob = await resp.blob();
+    const firma = (caseData.firmaName || "Insolvenzantrag").replace(/\s+/g, "_").slice(0, 40);
+    downloadBlob(blob, `Insolvenzantrag_${firma}.pdf`, "application/pdf");
+    toast("Insolvenzantrag-PDF heruntergeladen ✓", "success");
+  } catch(e) {
+    toast("Fehler: " + e.message, "error");
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
 }
 
 function showPdfHint() { showHint("PDF-Formular befüllen (fill_insolvenz.py)", `

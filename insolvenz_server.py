@@ -90,6 +90,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif m := re.fullmatch(r"/api/cases/(\d+)/versions", path):
             self._json(db.get_versions(int(m.group(1))))
 
+        elif m := re.fullmatch(r"/api/cases/(\d+)/antrag-pdf", path):
+            case = db.get_case(int(m.group(1)))
+            if not case:
+                self._err(404, "Fall nicht gefunden")
+                return
+            self._serve_antrag_pdf(case)
+
         elif m := re.fullmatch(r"/api/cases/(\d+)/export", path):
             case = db.get_case(int(m.group(1)))
             if not case:
@@ -145,6 +152,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"ok": True})
         else:
             self._err(404, "Unbekannter Endpunkt")
+
+    # ── Amtlicher Insolvenzantrag (PDF befüllen) ──────────────────────────────
+
+    def _serve_antrag_pdf(self, case: dict):
+        template = os.path.join(BASE_DIR, "antrag_vorlage_jp.pdf")
+        if not os.path.exists(template):
+            self._err(404, "Vorlage antrag_vorlage_jp.pdf nicht gefunden")
+            return
+        import fill_antrag_jp as filler
+        firma = case.get("firma_name", "Insolvenzantrag").replace(" ", "_")[:40]
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp_path = tmp.name
+            daten = case.get("daten", {})
+            if isinstance(daten, str):
+                import json as _json
+                daten = _json.loads(daten)
+            filled = filler.fill_pdf_antrag(daten, template, tmp_path)
+            with open(tmp_path, "rb") as f:
+                body = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="Insolvenzantrag_{firma}.pdf"')
+            self.send_header("Content-Length", len(body))
+            self._add_cors()
+            self.end_headers()
+            self.wfile.write(body)
+        except Exception as exc:
+            self._err(500, f"PDF-Erstellung fehlgeschlagen: {exc}")
+        finally:
+            if tmp_path:
+                try: os.unlink(tmp_path)
+                except OSError: pass
 
     # ── PDF-Import ────────────────────────────────────────────────────────────
 

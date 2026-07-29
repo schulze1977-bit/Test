@@ -328,6 +328,7 @@ def build_anlage_1b(data: dict, output_path: str):
 # ─────────────────────────────────────────────────────────────
 
 def fill_pdf_antrag(data: dict, template_path: str, output_path: str) -> int:
+    """Befüllt den amtlichen Insolvenzantrag (juristische Personen) mit Falldaten."""
     try:
         from pypdf import PdfReader, PdfWriter
         from pypdf.generic import NameObject, create_string_object
@@ -343,50 +344,175 @@ def fill_pdf_antrag(data: dict, template_path: str, output_path: str) -> int:
     plz_ort    = " ".join(filter(None, [data.get("plz",""), data.get("ort","")]))
     ort        = data.get("ort", "")
     heute      = date.today().strftime("%d.%m.%Y")
+    hr_nr      = data.get("hrNummer", "")
+    gruende    = data.get("insolvenzgruende", [])
+    verm       = data.get("vermoegen", {})
+    ort_datum  = f"{ort}, {heute}" if ort else heute
 
-    gruende = data.get("insolvenzgruende", [])
-    verm    = data.get("vermoegen", {})
-    def vb(key): return eur(verm.get(key, {}).get("betrag", 0)) if verm.get(key, {}).get("vorhanden") else "0,00"
+    def vb(key):
+        v = verm.get(key, {})
+        return eur(v.get("betrag", 0)) if v.get("vorhanden") else ""
 
-    mapping = {
+    def vv(key):
+        return verm.get(key, {}).get("vorhanden", False)
+
+    # ── Textfelder ──────────────────────────────────────────────────────────
+    text_map = {
+        # Antragsteller (Deckblatt)
         "In meiner  unserer Eigenschaft als": gf_funkt,
-        "Firma 1":  firma,
-        "Firma 2":  f"{rechtsform} – {strasse}, {plz_ort}",
-        "in":       ort,
-        "Ort Datum": f"{ort}, {heute}",
-        "Name":     gf_name,
-        "Amtsgericht":                  data.get("hrGericht", ""),
-        "1 Allgemeine AngabenRow1_2":   data.get("hrNummer", ""),
-        "Firma":                        firma,
-        "Zahlungsunfähigkeit":          "Ja" if "zahlungsunfaehigkeit" in gruende else "Nein",
-        "drohende Zahlungsunfähigkeit": "Ja" if "drohend"              in gruende else "Nein",
-        "Überschuldung":                "Ja" if "ueberschuldung"        in gruende else "Nein",
-        "Wert in EUR Gesamtbetrag":     vb("kasse"),
-        "Wert in EUR GesamtbetragB":    vb("betriebsmittel"),
-        "Wert in EUR GesamtbetragC":    vb("auftraege"),
-        "Wert in EUR GesamtbetragD":    vb("aussenstaende"),
-        "Wert in EUR GesamtbetragE":    vb("beteiligungen"),
-        "Wert in EUR GesamtbetragF":    vb("grundstuecke"),
-        "Anzahl der Arbeitnehmer":      str(data.get("maAnzahl", "")),
+        "Firma 1":    firma,
+        "Firma 2":    rechtsform,
+        "in":         ort,
+        "Name":       gf_name,
+        "Anschrift":  data.get("gfAnschrift", ""),
+        "Tel":        data.get("gfTelefon", ""),
+        "Telefon mobil": data.get("telefon", ""),
+        "Telefon":    data.get("telefonFest", ""),
+        "Telefax":    data.get("fax", ""),
+        "email":      data.get("email", ""),
+        # Verfahrensbevollmächtigter (Anwalt)
+        "1_2":        data.get("anwalt", ""),
+        # Allgemeine Angaben (Abschnitt 1)
+        "1 Allgemeine AngabenRow1_2": firma,
+        "1 Allgemeine AngabenRow2_2": f"{strasse}, {plz_ort}",
+        "1 Allgemeine AngabenRow3_2": rechtsform,
+        # Handelsregister
+        "Amtsgericht": data.get("hrGericht", ""),
+        "undefined_3": hr_nr,
+        # Unternehmensdaten (Abschnitt 2)
+        "Das Unternehmen ist tätig im Bereich":
+            data.get("branche", ""),
+        "Das Unternehmen ist allgemein anwaltlich vertreten durch":
+            data.get("anwalt", ""),
+        "Das Unternehmen ist steuerlich beraten durch":
+            data.get("steuerberater", ""),
+        "Gründungsgesellschafter waren":
+            data.get("gesellschafterInfo", ""),
+        "in voller Höhe bitte Belege beifügen":
+            data.get("stammkapital", ""),
+        # Betrieb
+        "undefined_7": data.get("betriebEingestelltDatum", ""),
+        # Mitarbeiter (Abschnitt 4)
+        "1 Wie viele Mitarbeiter sind derzeit noch bei der Schuldnerin beschäftigt":
+            str(data.get("maAnzahl", "")),
+        "Auszubildende 1": str(data.get("azubiAnzahl", "")),
+        "undefined_8":  data.get("kuendigungDatum", ""),
+        # SV-Rückstände
+        "undefined_9":  data.get("svBetrag", ""),
+        "bei":          data.get("svTraeger", ""),
+        # Lohn-Rückstände
+        "undefined_10": data.get("lohnBetrag", ""),
+        "für folgende Mitarbeiter": data.get("lohnRueckstandNamen", ""),
+        # Geschäftsräume (Abschnitt 5)
+        "undefined_11": data.get("mieteBetrag", ""),
+        "undefined_12": data.get("vermieterName", ""),
+        # Vermögen (Abschnitt 7) – Gesamtbeträge
+        "Wert in EUR Gesamtbetrag":  vb("kasse"),
+        "Wert in EUR GesamtbetragA": vb("betriebsmittel"),
+        "Wert in EUR GesamtbetragB": vb("auftraege"),
+        "Wert in EUR GesamtbetragC": vb("aussenstaende"),
+        "Wert in EUR GesamtbetragD": vb("beteiligungen"),
+        "Wert in EUR GesamtbetragE": vb("grundstuecke"),
+        "Wert in EUR GesamtbetragF": vb("sonstiges"),
     }
 
-    # Anlage 1A – erste 10 Gläubiger direkt ins PDF
+    # Ort/Datum auf allen Formularseiten
+    for suf in ("", "_2", "_3", "_4", "_5", "_6", "_7", "_8", "_9", "_10", "_11"):
+        text_map[f"Ort Datum{suf}"] = ort_datum
+
+    # ── Checkboxen ──────────────────────────────────────────────────────────
+    check_map = {
+        # Art des Antragstellers
+        "Geschäftsführerininnen":
+            gf_funkt in ("Geschäftsführer", "Geschäftsführerin"),
+        "persönlich haftender Gesellschafterininnen":
+            "haftender Gesellschafter" in gf_funkt,
+        # Verfahrensbevollmächtigter
+        "Verfahrensbevollmächtigter für das vorliegende Verfahren ist":
+            bool(data.get("anwalt")),
+        # Handelsregister ja/nein
+        "ja":   bool(hr_nr),
+        "nein": not bool(hr_nr),
+        "HRB":  rechtsform in ("GmbH", "UG", "UG (haftungsbeschränkt)", "AG", "SE"),
+        "HRA":  rechtsform in ("KG", "OHG", "GmbH & Co. KG", "KGaA"),
+        # Insolvenzgründe
+        "zahlungsunfähig":
+            "zahlungsunfaehigkeit" in gruende,
+        "voraussichtlich nicht in der Lage die bestehenden Zahlungspflichten bei Fälligkeit":
+            "drohend" in gruende,
+        "überschuldet":
+            "ueberschuldung" in gruende,
+        # Stammkapital
+        "Das Stammkapital in eingezahlt": bool(data.get("stammkapital")),
+        # Betrieb
+        "noch nicht eingestellt":
+            data.get("betriebStatus", "laufend") == "laufend",
+        "eingestellt seit":
+            data.get("betriebStatus", "laufend") == "eingestellt",
+        # Mitarbeiter Kündigung
+        "nein_2": not bool(data.get("kuendigungDatum")),
+        "ja zum":  bool(data.get("kuendigungDatum")),
+        # SV-Rückstände
+        "keine Rückstände":     not data.get("svRueckstaende"),
+        "Rückstände i H v EUR": bool(data.get("svRueckstaende")),
+        # Lohn-Rückstände
+        "keine Rückstände_2":     not data.get("lohnRueckstaende"),
+        "Rückstände i H v EUR_2": bool(data.get("lohnRueckstaende")),
+        # Geschäftsräume
+        "befinden sich noch unter der o g Anschrift": bool(data.get("vermieterName")),
+        "angemietet": data.get("mietePacht", "miete") != "pacht",
+        "gepachtet zu einem monatlichen Entgelt i H v EUR":
+            data.get("mietePacht") == "pacht",
+        "Vermieter  Verpächter ist": bool(data.get("vermieterName")),
+        "nicht vorhanden": not data.get("vermieterpfandrecht"),
+        "vorhanden i H v EUR": bool(data.get("vermieterpfandrecht")),
+        # Gläubigerverzeichnis
+        "nach Anlage 1A einfaches Gläubigerverzeichnis": True,
+        "nach Anlage 1B qualifiziertes Gläubigerverzeichnis nach  13 Absatz 1 Satz 4 bzw":
+            True,
+        # Vermögen vorhanden
+        "ja in Höhe":   vv("kasse"),
+        "ja in Höhe_2": vv("betriebsmittel"),
+        "ja in Höhe_3": vv("auftraege"),
+        "ja in Höhe_4": vv("aussenstaende"),
+        "ja in Höhe_5": vv("beteiligungen"),
+        "ja in Höhe_6": vv("grundstuecke"),
+        "ja in Höhe_7": vv("sonstiges"),
+    }
+
+    # ── Anlage 1A – erste 10 Gläubiger direkt ins PDF ───────────────────────
     glaeubiger = data.get("glaeubiger", [])
     for i, g in enumerate(glaeubiger[:10]):
-        row_suf = "" if i == 0 else f"_{i+1}"
-        anschrift = " ".join(filter(None, [g.get("anschrift",""), g.get("plz",""), g.get("ort","")]))
-        gesamt = (g.get("hauptforderung",0) or 0) + (g.get("zinsen",0) or 0) + (g.get("kosten",0) or 0)
-        mapping.update({
-            f"NrRow{i+1}":                                            str(i + 1),
-            f"NameKurzbezeichnung und Anschrift des GläubigersRow{i+1}":
-                " ".join(filter(None, [g.get("name",""), anschrift])),
-            f"ForderungsgrundO{row_suf}":    g.get("grund",""),
-            f"Hauptforderung in EURO{row_suf}": eur(g.get("hauptforderung",0)),
-            f"Höhe in EURO{row_suf}":        eur(g.get("zinsen",0)),
-            f"KostenO{row_suf}":             eur(g.get("kosten",0)),
-            f"Summe aller Hauptforderun gen des Gläu bigers in EURO{row_suf}": eur(gesamt),
+        n   = i + 1
+        suf = "" if n == 1 else f"_{n}"
+        adr = ", ".join(filter(None, [
+            g.get("anschrift",""), g.get("plz",""), g.get("ort","")
+        ]))
+        name_adr = " – ".join(filter(None, [g.get("name",""), adr]))
+        gesamt = sum(float(g.get(k, 0) or 0)
+                     for k in ("hauptforderung", "zinsen", "kosten"))
+        text_map.update({
+            f"NrRow{n}":
+                str(n),
+            f"NameKurzbezeichnung und Anschrift des GläubigersRow{n}":
+                name_adr,
+            f"ForderungsgrundO{suf}":
+                g.get("grund", ""),
+            f"Hauptforderung in EURO{suf}":
+                eur(g.get("hauptforderung", 0)),
+            f"Höhe in EURO{suf}":
+                eur(g.get("zinsen", 0)),
+            f"berechnet bis zumO{suf}":
+                g.get("zinsenBis", ""),
+            f"KostenO{suf}":
+                eur(g.get("kosten", 0)),
+            f"Forderung durch Sonderrechte gesichertO{suf}":
+                g.get("forderungGesichert", "nein"),
+            f"Summe aller Hauptforderun gen des Gläu bigers in EURO{suf}":
+                eur(gesamt),
         })
 
+    # ── PDF schreiben ────────────────────────────────────────────────────────
     reader = PdfReader(template_path)
     writer = PdfWriter()
     writer.append(reader)
@@ -403,20 +529,19 @@ def fill_pdf_antrag(data: dict, template_path: str, output_path: str) -> int:
                 continue
             if annot.get("/Subtype") != "/Widget":
                 continue
-            field_name = annot.get("/T")
-            if not field_name:
-                continue
-            fname = str(field_name)
-            value = mapping.get(fname)
-            if value is None:
-                for k, v in mapping.items():
-                    if k in fname or fname in k:
-                        value = v
-                        break
-            if value is not None:
+            fname = str(annot.get("/T", ""))
+            ftype = str(annot.get("/FT", ""))
+
+            if ftype == "/Tx" and fname in text_map and text_map[fname]:
                 annot.update({
-                    NameObject("/V"): create_string_object(str(value)),
-                    NameObject("/AP"): create_string_object(""),
+                    NameObject("/V"): create_string_object(str(text_map[fname])),
+                })
+                filled += 1
+            elif ftype == "/Btn" and fname in check_map:
+                state = NameObject("/On") if check_map[fname] else NameObject("/Off")
+                annot.update({
+                    NameObject("/V"):  state,
+                    NameObject("/AS"): state,
                 })
                 filled += 1
 
