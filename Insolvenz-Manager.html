@@ -1007,20 +1007,41 @@ body {
 
 <!-- ═══════════════ MODAL: IMPORT ═══════════════ -->
 <div id="modal-overlay" class="modal-overlay hidden" onclick="if(event.target===this)closeModal()">
-  <div class="modal">
+  <div class="modal" style="max-width:520px">
     <h3>📥 Mandanten-Fragebogen importieren</h3>
-    <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem">
-      Laden Sie die JSON-Datei hoch oder fügen Sie den kodierten Block aus der E-Mail ein.
-    </p>
+
+    <!-- ── Option 1: Ausgefülltes PDF ── -->
+    <div class="form-group" style="background:var(--light);border:2px solid var(--navy);border-radius:6px;padding:.9rem">
+      <label style="font-weight:700;color:var(--navy)">📄 Option 1 – Ausgefülltes PDF hochladen</label>
+      <p style="font-size:.8rem;color:var(--muted);margin:.3rem 0 .6rem">
+        Schicken Sie dem Mandanten den <strong>Mandantenfragebogen_RCS_ausfuellbar.pdf</strong>.
+        Nach Rücksendung laden Sie das ausgefüllte PDF hier hoch – Gläubiger und Basisdaten
+        werden automatisch übernommen.
+      </p>
+      <label class="btn btn-outline btn-sm" style="cursor:pointer;display:inline-block">
+        📂 PDF auswählen…
+        <input type="file" id="import-pdf-file" accept=".pdf" style="display:none"
+               onchange="onPdfFileSelected(this)">
+      </label>
+      <span id="pdf-filename" style="margin-left:.7rem;font-size:.85rem;color:var(--muted)"></span>
+      <div id="pdf-import-status" style="margin-top:.5rem;font-size:.82rem;min-height:1.2rem"></div>
+    </div>
+
+    <p style="text-align:center;color:var(--muted);font-size:.8rem;margin:.6rem 0">── oder ──</p>
+
+    <!-- ── Option 2: JSON ── -->
     <div class="form-group">
-      <label>JSON-Datei hochladen</label>
+      <label>📋 Option 2 – JSON-Datei hochladen</label>
       <input type="file" class="form-control" id="import-file" accept=".json">
     </div>
+
+    <!-- ── Option 3: E-Mail-Code ── -->
     <div class="form-group">
-      <label>— oder — Text aus E-Mail einfügen</label>
-      <textarea class="form-control" id="import-text" rows="6"
+      <label>✉️ Option 3 – Code aus E-Mail einfügen</label>
+      <textarea class="form-control" id="import-text" rows="4"
         placeholder="Alles einfügen inkl. ===INSOLVENZ-START=== … ===INSOLVENZ-ENDE==="></textarea>
     </div>
+
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">Abbrechen</button>
       <button class="btn btn-gold" onclick="doImport()">Importieren</button>
@@ -1888,6 +1909,9 @@ function showHint(title, html) {
 
 function openImportModal() {
   document.getElementById("modal-overlay").classList.remove("hidden");
+  document.getElementById("import-pdf-file").value = "";
+  document.getElementById("pdf-filename").textContent = "";
+  document.getElementById("pdf-import-status").textContent = "";
   document.getElementById("import-file").value = "";
   document.getElementById("import-text").value = "";
 }
@@ -1896,14 +1920,23 @@ function closeModal() {
   document.getElementById("modal-overlay").classList.add("hidden");
 }
 
+function onPdfFileSelected(input) {
+  const name = input.files[0] ? input.files[0].name : "";
+  document.getElementById("pdf-filename").textContent = name;
+  document.getElementById("pdf-import-status").textContent = "";
+}
+
 function doImport() {
-  const file = document.getElementById("import-file").files[0];
+  const pdfFile = document.getElementById("import-pdf-file").files[0];
+  const jsonFile = document.getElementById("import-file").files[0];
   const text = document.getElementById("import-text").value.trim();
 
-  if (file) {
+  if (pdfFile) {
+    doImportPdf(pdfFile);
+  } else if (jsonFile) {
     const reader = new FileReader();
     reader.onload = e => { applyImport(e.target.result); };
-    reader.readAsText(file);
+    reader.readAsText(jsonFile);
   } else if (text) {
     let raw = text;
     const m = text.match(/===INSOLVENZ-START===\s*([\s\S]*?)\s*===INSOLVENZ-ENDE===/);
@@ -1916,17 +1949,52 @@ function doImport() {
   }
 }
 
+async function doImportPdf(file) {
+  if (!state.serverOnline) {
+    toast("Server nicht erreichbar – bitte insolvenz_server.py starten", "error");
+    return;
+  }
+  const statusEl = document.getElementById("pdf-import-status");
+  statusEl.style.color = "var(--muted)";
+  statusEl.textContent = "⏳ PDF wird analysiert…";
+  try {
+    const resp = await fetch("/api/import-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/pdf" },
+      body: file,
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.fehler || `HTTP ${resp.status}`);
+    }
+    const info = data._import_info || {};
+    statusEl.style.color = "green";
+    statusEl.textContent =
+      `✓ ${info.felder || "?"} Felder gelesen · ${info.glaeubiger || 0} Gläubiger importiert`;
+    delete data._import_info;
+    setTimeout(() => applyImportData(data), 600);
+  } catch(e) {
+    statusEl.style.color = "var(--red)";
+    statusEl.textContent = "❌ " + e.message;
+    toast("PDF-Import fehlgeschlagen: " + e.message, "error");
+  }
+}
+
 function applyImport(jsonStr) {
   try {
-    const imported = JSON.parse(jsonStr);
-    caseData = { ...newCaseData(), ...imported };
-    closeModal();
-    newCase();
-    formToUI();
-    toast("Fragebogen erfolgreich importiert ✓", "success");
+    applyImportData(JSON.parse(jsonStr));
   } catch(e) {
     toast("JSON-Fehler: " + e.message, "error");
   }
+}
+
+function applyImportData(imported) {
+  caseData = { ...newCaseData(), ...imported };
+  closeModal();
+  newCase();
+  formToUI();
+  const gl = (caseData.glaeubiger || []).length;
+  toast(`Fragebogen importiert · ${gl} Gläubiger ✓`, "success");
 }
 
 // ══════════════════════════════════════════════════════════════════

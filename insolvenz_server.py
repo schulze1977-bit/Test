@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 import threading
 import webbrowser
 from urllib.parse import urlparse
@@ -32,6 +33,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.insert(0, BASE_DIR)
 import insolvenz_db as db
+import import_adobe_pdf as pdf_import
 
 MIME = {
     ".html": "text/html; charset=utf-8",
@@ -119,6 +121,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             result = db.restore_version(int(m.group(2)), int(m.group(1)))
             self._json(result) if result else self._err(404, "Version nicht gefunden")
 
+        elif path == "/api/import-pdf":
+            self._api_import_pdf()
+
         else:
             self._err(404, "Unbekannter Endpunkt")
 
@@ -140,6 +145,41 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json({"ok": True})
         else:
             self._err(404, "Unbekannter Endpunkt")
+
+    # ── PDF-Import ────────────────────────────────────────────────────────────
+
+    def _api_import_pdf(self):
+        length = int(self.headers.get("Content-Length", 0))
+        if length == 0:
+            self._err(400, "Keine PDF-Daten empfangen")
+            return
+        pdf_bytes = self.rfile.read(length)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(pdf_bytes)
+                tmp_path = tmp.name
+            raw = pdf_import.read_pdf_fields(tmp_path)
+            if not raw:
+                self._err(422, "Keine Formularfelder im PDF gefunden – "
+                               "bitte nur ausfüllbare Adobe-PDFs verwenden")
+                return
+            data = pdf_import.map_fields_to_data(raw)
+            gl_count = len(data.get("glaeubiger", []))
+            data["_import_info"] = {
+                "felder": len(raw),
+                "glaeubiger": gl_count,
+                "quelle": "pdf",
+            }
+            self._json(data)
+        except Exception as exc:
+            self._err(500, f"PDF-Analyse fehlgeschlagen: {exc}")
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     # ── Hilfsfunktionen ───────────────────────────────────────────────────────
 
