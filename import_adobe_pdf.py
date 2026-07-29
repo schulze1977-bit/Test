@@ -15,6 +15,7 @@ Voraussetzung:
 """
 
 import json
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -259,6 +260,7 @@ def map_fields_to_data(raw: dict) -> dict:
 
     grund_flags = {"zahlungsunfaehigkeit": False, "drohend": False, "ueberschuldung": False}
     gl_raw: dict[int, dict] = {}
+    rcs_gl_raw: dict[int, dict] = {}
     _extras: dict = {}  # temporärer Speicher für _-Schlüssel
 
     # ── Checkbox-Flags für Betrieb/Mitarbeiter ──────────────────────────────
@@ -324,6 +326,33 @@ def map_fields_to_data(raw: dict) -> dict:
                 break
 
         if matched:
+            continue
+
+        # ── GL1-GL15: RCS-Fragebogen Gläubigerstruktur ──────────────────────
+        m_gl = re.fullmatch(r"GL(\d+)_(.+)", field_name, re.IGNORECASE)
+        if m_gl:
+            gl_n = int(m_gl.group(1))
+            gl_sub = m_gl.group(2).lower()
+            if 1 <= gl_n <= 15:
+                rcs = rcs_gl_raw.setdefault(gl_n, {})
+                if gl_sub == "name":
+                    rcs["name"] = value_str
+                elif gl_sub == "grund":
+                    rcs["grund"] = value_str
+                elif gl_sub == "haupt":
+                    rcs["hauptforderung"] = _parse_eur(value_str)
+                elif gl_sub == "zinsen":
+                    rcs["zinsen"] = _parse_eur(value_str)
+                elif gl_sub == "zinsen_bis":
+                    rcs["zinsenBis"] = value_str
+                elif gl_sub == "kosten":
+                    rcs["kosten"] = _parse_eur(value_str)
+                elif gl_sub == "tituliert":
+                    rcs["forderungTituliert"] = "ja" if _is_checked(value_str) else "nein"
+                elif gl_sub == "sonder":
+                    rcs["forderungGesichert"] = "ja" if _is_checked(value_str) else "nein"
+                elif gl_sub == "nahestehend":
+                    rcs["nahestehendeP138"] = "ja" if _is_checked(value_str) else "nein"
             continue
 
         # ── Gläubiger-Felder (Anlage 1A im AG-Formular) ─────────────────────
@@ -419,7 +448,6 @@ def map_fields_to_data(raw: dict) -> dict:
     # Außenstände aus Detail-Text (i5_detail enthält oft EUR-Betrag)
     if _extras.get("_verm_aussenstaende_detail"):
         detail = _extras["_verm_aussenstaende_detail"]
-        import re
         m = re.search(r"([\d.,]+)\s*(?:EUR|€)", detail)
         if m and not data["vermoegen"]["aussenstaende"]["betrag"]:
             betrag = _parse_eur(m.group(1))
@@ -439,6 +467,28 @@ def map_fields_to_data(raw: dict) -> dict:
         g = gl_raw[idx]
         if g.get("name"):
             data["glaeubiger"].append(g)
+
+    # Gläubiger aus GL1-GL15 (RCS-Mandantenfragebogen)
+    for idx in sorted(rcs_gl_raw.keys()):
+        g = rcs_gl_raw[idx]
+        if g.get("name"):
+            entry = {
+                "name":              g.get("name", ""),
+                "grund":             g.get("grund", ""),
+                "anschrift":         "",
+                "plz":               "",
+                "ort":               "",
+                "hauptforderung":    g.get("hauptforderung", 0),
+                "zinsen":            g.get("zinsen", 0),
+                "zinsenBis":         g.get("zinsenBis", ""),
+                "kosten":            g.get("kosten", 0),
+                "vertreter":         "",
+                "forderungTituliert": g.get("forderungTituliert", "nein"),
+                "forderungGesichert": g.get("forderungGesichert", "nein"),
+                "nahestehendeP138":   g.get("nahestehendeP138", "nein"),
+                "kategorie":          "",
+            }
+            data["glaeubiger"].append(entry)
 
     return data
 
